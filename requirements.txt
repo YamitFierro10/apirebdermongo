@@ -1,0 +1,6 @@
+o==0.0.2b2
+openai==1.42.0
+python-dotenv==1.0.1
+twilio==9.2.4
+
+reflex==0.5.10
