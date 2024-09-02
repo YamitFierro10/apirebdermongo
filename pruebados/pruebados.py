@@ -35,11 +35,11 @@ def get_ai_response(message):
     return response['choices'][0]['message']['content'].strip()
 
 # Función para enviar un mensaje de WhatsApp
-def send_whatsapp_message(to, message):
+def send_whatsapp_message(message):
     client.messages.create(
         from_="whatsapp:+14155238886",  # Cambia esto por tu número de Twilio para WhatsApp
         body=message,
-        to=f"whatsapp:{to}"
+        to="whatsapp:+573102423332"
     )
 
 # Función para manejar mensajes entrantes de Twilio
