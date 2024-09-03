@@ -74,7 +74,7 @@ async def handle_incoming_message(request: Request):
     client.messages.create(
         from_="whatsapp:+14155238886",  # Número de Twilio
         body=ai_reply,
-        to="whatsapp:+573102423332"  # Tu número de WhatsApp 
+        to=from_number  # Tu número de WhatsApp 
     )
     print(f"Mensaje enviado a {from_number}: {ai_reply}")
         
