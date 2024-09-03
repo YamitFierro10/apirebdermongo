@@ -25,10 +25,10 @@ client = Client(twilio_sid, twilio_token)
 
 # Función para obtener respuesta de OpenAI
 def get_ai_response(message):
-    response = openai.ChatCompletion.create(
+    response = openai.completions.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": "Eres un asistente útil."},
+            {"role": "system", "content": "Eres un asistente de chat útil."},
             {"role": "user", "content": message}
         ]
     )
