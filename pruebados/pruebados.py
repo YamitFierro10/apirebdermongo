@@ -1,36 +1,34 @@
 """Welcome to Reflex! This file outlines the steps to create a basic app."""
 
+import os
 import reflex as rx
-from fastapi import Request
 from openai import OpenAI
+from fastapi import Request
 from twilio.rest import Client
 from dotenv import load_dotenv
-import os
 from pruebados.api import handle
 
 
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
 
+
 # Configura las claves de API
 OpenAI.api_key = os.getenv("OPENAI_API_KEY")
 twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
 twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
 
+system_rol="Eres un asistente de chat útil."
 
-# Función para obtener respuesta de OpenAI
-def get_ai_response(message):
-    response = OpenAI.chat.completions.create(
+mensaje=[{"role": "system", "content": system_rol}]
+
+def get_ai_response(respuesta):
+    completar= OpenAI().chat.completions.create(
         model="gpt-4",
-        messages=[
-            {"role": "system", "content": "Eres un asistente de chat útil."},
-            {"role": "user", "content": message}
-        ]
+        messages=mensaje,
     )
-    return response['choices'][0]['message']['content']
-
-
-# Función para manejar mensajes entrantes de Twilio
+    respuesta=completar.choices[0].message.content
+    return respuesta
 
 async def handle_incoming_message(request: Request):
     form = await request.form()  # Extrae el formulario de la solicitud
@@ -53,7 +51,7 @@ async def handle_incoming_message(request: Request):
     return {"status": "success", "response": ai_reply}
 
 
-# Reflex app
+#Reflex app
 app = rx.App()
 app.api.add_api_route("/handle",handle) 
 app.api.add_api_route("/whatsapp", handle_incoming_message, methods=["POST"])
