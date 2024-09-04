@@ -43,14 +43,14 @@ def get_ai_response(respuesta):
     respuesta=completar.choices[0].message.content
     return respuesta
 
-async def handle_incoming_message(request: Request):
-    form = await request.form()  # Extrae el formulario de la solicitud
-    incoming_msg = form.get("Body")  # Extrae el mensaje
-    from_number = form.get("From")  # Extrae el número de remitente
-
-    # Generar la respuesta AI usando OpenAI
+def handle_incoming_message():
+    incoming_msg = Request.form["Body"]  # Extrae el mensaje
     ai_reply = get_ai_response(incoming_msg)
+    
+    # Generar la respuesta AI usando OpenAI
+   
     client = Client(twilio_sid, twilio_token)
+    from_number = Request.form["From"] # Extrae el número de remitente
         
     # Enviar la respuesta de vuelta al usuario por WhatsApp
     client.messages.create(
@@ -58,10 +58,9 @@ async def handle_incoming_message(request: Request):
         body=ai_reply,
         to=from_number  # Tu número de WhatsApp 
     )
-    print(f"Mensaje enviado a {from_number}: {ai_reply}")
         
     # Retornar una respuesta JSON
-    return {"status": "success", "response": ai_reply}
+    return "Return:OK"
 
 #Reflex app
 app = rx.App()
