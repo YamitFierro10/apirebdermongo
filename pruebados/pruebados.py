@@ -43,8 +43,8 @@ def get_ai_response(respuesta):
     respuesta=completar.choices[0].message.content
     return respuesta
 
-def handle_incoming_message(request):
-    form = request.form  # Extrae el formulario de la solicitud
+async def handle_incoming_message(request: Request):
+    form = await request.form()  # Extrae el formulario de la solicitud
     incoming_msg = form.get("Body")  # Extrae el mensaje
     from_number = form.get("From")  # Extrae el número de remitente
 
