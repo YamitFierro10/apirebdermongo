@@ -29,7 +29,7 @@ OpenAI.api_key = os.getenv("OPENAI_API_KEY")
 twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
 twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
 
-system_rol='''Eres una asitente util'''
+system_rol='''Eres una asitente util responde las preguntas que tenga el usuario'''
 
 
 mensaje=[{"role": "system", "content": system_rol}]
@@ -42,8 +42,8 @@ def get_ai_response(respuesta):
     respuesta=completar.choices[0].message.content
     return respuesta
 
-async def handle_incoming_message(request: Request):
-    form = await request.form()  # Extrae el formulario de la solicitud
+def handle_incoming_message(request: Request):
+    form = request.form()  # Extrae el formulario de la solicitud
     incoming_msg = form.get("Body")  # Extrae el mensaje
     from_number = form.get("From")  # Extrae el número de remitente
 
