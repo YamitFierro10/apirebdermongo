@@ -33,7 +33,7 @@ system_rol='''Eres una asitente util y respondes a las preguntas'''
 
 mensaje=[{"role": "system", "content": system_rol}]
 
-async def get_ai_response(user_message):
+def get_ai_response(user_message):
     # Inserta el mensaje del usuario en el historial de mensajes
     mensaje.append({"role": "user", "content": user_message})
     
