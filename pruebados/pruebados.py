@@ -71,11 +71,11 @@ def get_ai_response(user_message):
         model="gpt-4",
         messages=mensaje,
     )
-    respuesta = completar.choices[0].message.content
+    answer2 = completar.choices[0].message.content
     
     # Añade la respuesta al historial de mensajes
-    mensaje.append({"role": "assistant", "content": respuesta})
-    return respuesta
+    mensaje.append({"role": "assistant", "content": answer2})
+    return answer2
 
 async def handle_incoming_message(request: Request):
     form = await request.form()  # Extrae el formulario de la solicitud
