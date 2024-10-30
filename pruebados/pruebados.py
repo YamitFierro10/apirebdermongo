@@ -42,15 +42,15 @@ def get_ai_response(respuesta):
     respuesta=completar.choices[0].message.content
     return respuesta
 
-def handle_incoming_message(request: Request):
-    incoming_msg= request.form['Body']  # Extrae el formulario de la solicitud
+def handle_incoming_message():
+    incoming_msg= Request.form['Body']  # Extrae el formulario de la solicitud
    # incoming_msg = form.get("Body")  # Extrae el mensaje
    #from_number = form.get("From")  # Extrae el número de remitente
 
     # Generar la respuesta AI usando OpenAI
     ai_reply = get_ai_response(incoming_msg)
     client = Client(twilio_sid, twilio_token)
-    from_number= request.form['From']
+    from_number= Request.form['From']
         
     # Enviar la respuesta de vuelta al usuario por WhatsApp
     client.messages.create(
