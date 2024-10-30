@@ -33,12 +33,18 @@ system_rol='''Eres una asitente util y respondes a las preguntas'''
 
 mensaje=[{"role": "system", "content": system_rol}]
 
-def get_ai_response(respuesta):
+async def get_ai_response(user_message):
+    # Inserta el mensaje del usuario en el historial de mensajes
+    mensaje.append({"role": "user", "content": user_message})
+    
     completar= OpenAI().chat.completions.create(
         model="gpt-4",
         messages=mensaje,
     )
-    respuesta=completar.choices[0].message.content
+    respuesta = completar.choices[0].message.content
+    
+    # Añade la respuesta al historial de mensajes
+    mensaje.append({"role": "assistant", "content": respuesta})
     return respuesta
 
 async def handle_incoming_message(request: Request):
