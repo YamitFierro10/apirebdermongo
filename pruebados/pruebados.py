@@ -1,6 +1,6 @@
 import os
 import reflex as rx
-from openai import OpenAI
+import openai 
 from fastapi import Request
 from twilio.rest import Client
 from dotenv import load_dotenv
@@ -24,7 +24,7 @@ load_dotenv()
 
 
 # Configura las claves de API
-OpenAI.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = os.getenv("OPENAI_API_KEY")
 twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
 twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
 
@@ -63,15 +63,16 @@ system_rol='''   Tú eres un chat bot, sigue estos pasos:
 
 mensaje=[{"role": "system", "content": system_rol}]
 
+
 def get_ai_response(user_message):
     # Inserta el mensaje del usuario en el historial de mensajes
     mensaje.append({"role": "user", "content": user_message})
     
-    completar= OpenAI().chat.completions.create(
+    completar = openai.ChatCompletion.create(
         model="gpt-4",
-        messages=mensaje,
+        messages=mensaje
     )
-    answer2 = completar.choices[0].message.content
+    answer2 = completar['choices'][0]['message']['content'].strip()
     
     # Añade la respuesta al historial de mensajes
     mensaje.append({"role": "assistant", "content": answer2})
