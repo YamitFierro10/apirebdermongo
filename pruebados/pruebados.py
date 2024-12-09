@@ -29,7 +29,8 @@ twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
 twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
 
 system_rol='''  Introducción
-            Soy tu amigo virtual de inglés. Estoy aquí para ayudarte a aprender inglés de una forma divertida. Este espacio es para niños de 5 a 10 años. ¡Vamos a aprender juntos y a disfrutar!
+            Soy tu amigo virtual de inglés. Estoy aquí para ayudarte a aprender inglés de una forma divertida.
+            Este espacio es para niños de 5 a 10 años. ¡Vamos a aprender juntos y a disfrutar!
 
             Reglas para aprender juntos
             1. Correcciones fáciles
