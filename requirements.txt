@@ -60,9 +60,6 @@ python-socketio==5.11.3
 pywin32-ctypes==0.2.3
 readme_renderer==44.0
 redis==5.0.8
-reflex==0.5.10
-reflex-chakra==0.5.10
-reflex-hosting-cli==0.1.13
 requests==2.32.3
 requests-toolbelt==1.0.0
 rfc3986==2.0.0

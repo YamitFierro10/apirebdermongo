@@ -3,11 +3,17 @@ FROM python:3.11
 WORKDIR /app
 COPY . .
 
+# Crear y activar el entorno virtual
 ENV VIRTUAL_ENV=/app/.venv_docker
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN python3.11 -m venv $VIRTUAL_ENV
+RUN python -m venv $VIRTUAL_ENV  # Crea el entorno virtual
 
-RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+# Instalar dependencias dentro del entorno virtual
+RUN $VIRTUAL_ENV/bin/pip install --upgrade pip
+RUN $VIRTUAL_ENV/bin/pip install --no-cache-dir -r requirements.txt
 
-CMD reflex run --env prod --backend-only
+# Exponer el puerto en el que correrá FastAPI
+EXPOSE 8000
+
+# Comando de inicio para FastAPI
+CMD uvicorn main:app --host 0.0.0.0 --port 8000
