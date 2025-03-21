@@ -34,4 +34,4 @@ async def handle_incoming_message(request: Request):
     print(f"Mensaje enviado a {from_number}: {ai_reply}")
     return {"status": "success", "response": ai_reply}
 
-app.include_router(handle)
+app.add_api_route("/handle", handle, methods=["POST"])
