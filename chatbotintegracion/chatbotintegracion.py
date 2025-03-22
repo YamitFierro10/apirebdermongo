@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from twilio.rest import Client
-from chatbot import get_ai_response
+from chatbotintegracion.chatbot import get_ai_response
 import os
 from dotenv import load_dotenv
 from chatbotintegracion.api import handle

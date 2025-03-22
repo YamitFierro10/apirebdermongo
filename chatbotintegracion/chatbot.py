@@ -1,5 +1,5 @@
 import openai
-from database import collection, obtener_archivo
+from .database import collection, obtener_archivo
 import os
 
 # Configurar API Key de OpenAI

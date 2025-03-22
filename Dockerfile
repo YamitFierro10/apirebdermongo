@@ -1,7 +1,7 @@
 FROM python:3.11
 
+COPY . /app
 WORKDIR /app
-COPY . .
 
 # Crear y activar el entorno virtual
 ENV VIRTUAL_ENV=/app/.venv_docker
