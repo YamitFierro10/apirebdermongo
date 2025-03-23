@@ -17,9 +17,13 @@ def get_ai_response(user_message, user_id):
     # ✅ Asegurar que `user_message` siempre sea una cadena antes de aplicar `.strip()`
     user_message = str(user_message).strip().lower()
 
-    # 🔍 Buscar historial de conversación en MongoDB
-    historial = list(collection.find({"user_id": user_id}, {"_id": 0, "role": 1, "content": 1}))
-    mensajes = [{"role": msg["role"], "content": msg["content"]} for msg in historial] if historial else []
+    # 🔍 Intentar recuperar historial de conversación desde MongoDB
+    mensajes = []
+    try:
+        historial = list(collection.find({"user_id": user_id}, {"_id": 0, "role": 1, "content": 1}))
+        mensajes = [{"role": msg["role"], "content": msg["content"]} for msg in historial] if historial else []
+    except Exception as e:
+        print("⚠️ Error al conectar con MongoDB:", e)
 
     # 🔥 Selección del prompt adecuado
     if "hacer un contrato" in user_message or "crear documento" in user_message:
@@ -41,14 +45,21 @@ def get_ai_response(user_message, user_id):
 
     # 🎯 Generar respuesta con OpenAI
     mensajes.append({"role": "user", "content": user_message})
-    completar = openai.ChatCompletion.create(model="gpt-4", messages=mensajes)
-    answer = completar['choices'][0]['message']['content'].strip()
+    
+    try:
+        completar = openai.ChatCompletion.create(model="gpt-4", messages=mensajes)
+        answer = completar['choices'][0]['message']['content'].strip()
+    except Exception as e:
+        print("⚠️ Error al obtener respuesta de OpenAI:", e)
+        return "Lo siento, ocurrió un problema al procesar tu solicitud."
 
-    # 💾 Guardar conversación en MongoDB
-    collection.insert_many([
-        {"user_id": user_id, "role": "user", "content": user_message},
-        {"user_id": user_id, "role": "assistant", "content": answer}
-    ])
+    # 💾 Intentar guardar conversación en MongoDB (sin bloquear la respuesta)
+    try:
+        collection.insert_many([
+            {"user_id": user_id, "role": "user", "content": user_message},
+            {"user_id": user_id, "role": "assistant", "content": answer}
+        ])
+    except Exception as e:
+        print("⚠️ No se pudo guardar en MongoDB:", e)
 
     return answer
-
