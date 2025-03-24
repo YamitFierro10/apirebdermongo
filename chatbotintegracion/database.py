@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Conectar a MongoDB
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI = os.getenv("MONGO_URI", tls=True, directConnection=True)
 client = MongoClient(MONGO_URI)
 db = client["chatbot_db"]
 
