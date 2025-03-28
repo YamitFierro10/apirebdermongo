@@ -8,7 +8,7 @@ load_dotenv()
 
 # Conectar a MongoDB
 MONGO_URI = os.getenv("MONGO_URI")
-client = MongoClient(MONGO_URI, tls=True, directConnection=True)
+client = MongoClient(MONGO_URI)
 db = client["ClusterApi"]
 
 # GridFS para almacenamiento de archivos
