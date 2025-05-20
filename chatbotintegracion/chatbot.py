@@ -6,7 +6,26 @@ import os
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # 🎯 Prompts especializados
-PROMPT_GENERAL = "Eres DocuBot, un asistente experto en documentos legales y administrativos..."
+
+PROMPT_AGRICOLA = """"
+Actúa como un ingeniero agrónomo con más de 20 años de experiencia en agricultura sostenible y manejo de cultivos. 
+Analiza los datos proporcionados y brinda recomendaciones técnicas claras y prácticas para optimizar la producción agrícola.
+
+Datos del cultivo:
+- Tipo de cultivo: 
+- Ubicación y clima: 
+
+Tu respuesta debe incluir:
+1. Diagnóstico general de la situación.
+2. Recomendaciones técnicas para mejorar la productividad.
+3. Sugerencias sostenibles y buenas prácticas agrícolas.
+4. Calendario tentativo de actividades si es posible.
+
+Usa un lenguaje claro pero técnico, con enfoque práctico y orientado a resultados.
+"""
+
+
+
 PROMPT_DOCUMENTOS = "Tu tarea es ayudar a los usuarios a generar documentos legales como contratos..."
 PROMPT_EXPLICACIONES = "Eres un experto en derecho y asesoras a los usuarios explicando términos legales..."
 PROMPT_EDICION = "El usuario ha solicitado hacer cambios en un documento generado..."
@@ -33,7 +52,7 @@ def get_ai_response(user_message, user_id):
     elif "editar documento" in user_message or "cambiar información" in user_message:
         prompt = PROMPT_EDICION
     else:
-        prompt = PROMPT_GENERAL
+        prompt = PROMPT_AGRICOLA
 
     # Agregar prompt al historial
     mensajes.insert(0, {"role": "system", "content": prompt})
