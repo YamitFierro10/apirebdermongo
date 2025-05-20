@@ -8,14 +8,14 @@ load_dotenv()
 
 # Conectar a MongoDB
 MONGO_URI = os.getenv("MONGO_URI")
-client = MongoClient(MONGO_URI, tls=True, tlsCAFile=None)
-db = client["Chatbot_db"]
+client_db = MongoClient(MONGO_URI, tls=True, tlsCAFile=None).Chatbot_db
+#db = client[""]
 
 # GridFS para almacenamiento de archivos
-fs = gridfs.GridFS(db)
+fs = gridfs.GridFS(client_db)
 
 # Colección para historiales de conversación
-collection = db["conversaciones"]
+collection = client_db["conversaciones"]
 
 def guardar_archivo(ruta_archivo, nombre_archivo):
     """Guarda un archivo en MongoDB GridFS"""
