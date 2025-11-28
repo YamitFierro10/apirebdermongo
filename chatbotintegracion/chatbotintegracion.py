@@ -122,4 +122,5 @@ async def handle_incoming_message(request: Request):
 # ===========================================================
 # Mantener tu endpoint adicional
 # ===========================================================
-app.add_api_route("/handle", handle, methods=["POST"])
+app.add_api_route("/handle", handle, methods=["GET", "POST"])
+
