@@ -63,7 +63,7 @@ twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"
 
 if not twilio_sid or not twilio_token:
-    print("⚠️ ADVERTENCIA: Twilio no está completamente configurado.")
+    print("⚠️ ADVERTENCIA: Twilio no está configurado. WhatsApp no funcionará.")
     twilio_client = None
 else:
     twilio_client = Client(twilio_sid, twilio_token)
@@ -73,16 +73,12 @@ else:
 # ===========================================================
 app = FastAPI()
 
-
 # ===========================================================
-# STARTUP: INICIALIZAR GEMINI
+# STARTUP: INICIALIZAR GEMINI UNA VEZ
 # ===========================================================
 @app.on_event("startup")
 def startup_event():
-    """
-    Inicializa el cliente Gemini UNA sola vez para seguridad,
-    sin usarlo para requests (el cliente final vive en chatbot.py).
-    """
+    """Inicializa el cliente Gemini una sola vez al iniciar el servidor."""
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
     if not GEMINI_API_KEY:
@@ -91,32 +87,31 @@ def startup_event():
         return
 
     try:
-        # Solo para validar que la API Key funciona
         chatbot_module.client = genai.Client(api_key=GEMINI_API_KEY)
-        print("✅ Gemini inicializado correctamente al iniciar el servidor.")
+        print("✅ Gemini inicializado correctamente.")
     except Exception as e:
         print(f"❌ ERROR al inicializar Gemini: {e}")
         chatbot_module.client = None
 
 
 # ===========================================================
-# ENDPOINT PRINCIPAL DE TWILIO WHATSAPP
+# ENDPOINT PRINCIPAL DE WHATSAPP (TWILIO)
 # ===========================================================
 @app.post("/whatsapp")
 async def handle_incoming_message(request: Request):
 
+    # Twilio envía datos como form-data
     form = await request.form()
     incoming_msg = form.get("Body")
     from_number = form.get("From")
 
     if not incoming_msg:
-        # Twilio siempre exige un XML válido.
         return MessagingResponse()
 
-    # 🧠 GENERAR RESPUESTA DE GEMINI
+    # Obtener respuesta de Gemini
     ai_reply = get_ai_response(incoming_msg, from_number)
 
-    # 📝 Respuesta Twilio
+    # Crear respuesta TwiML
     resp = MessagingResponse()
     resp.message(ai_reply)
 
@@ -127,7 +122,7 @@ async def handle_incoming_message(request: Request):
 
 
 # ===========================================================
-# ENDPOINT /handle (GET + POST)
+# ENDPOINT /handle
 # ===========================================================
 app.add_api_route("/handle", handle, methods=["GET", "POST"])
 
