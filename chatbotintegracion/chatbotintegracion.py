@@ -40,15 +40,12 @@
 
 from fastapi import FastAPI, Request
 from twilio.twiml.messaging_response import MessagingResponse
-from twilio.rest import Client
-
-from chatbotintegracion.chatbot import get_ai_response
-from chatbotintegracion import chatbot as chatbot_module
-from chatbotintegracion.api import handle
-
-import os
 from dotenv import load_dotenv
+from chatbotintegracion.chatbot import get_ai_response
+from chatbotintegracion.api import handle
+from chatbotintegracion import chatbot as chatbot_module
 from google import genai
+import os
 
 # ===========================================================
 # CARGAR VARIABLES DE ENTORNO
@@ -56,29 +53,19 @@ from google import genai
 load_dotenv()
 
 # ===========================================================
-# CONFIGURAR TWILIO
-# ===========================================================
-twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
-twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"
-
-if not twilio_sid or not twilio_token:
-    print("⚠️ ADVERTENCIA: Twilio no está configurado. WhatsApp no funcionará.")
-    twilio_client = None
-else:
-    twilio_client = Client(twilio_sid, twilio_token)
-
-# ===========================================================
-# INICIALIZAR FASTAPI
+# CONFIGURAR FASTAPI
 # ===========================================================
 app = FastAPI()
 
 # ===========================================================
-# STARTUP: INICIALIZAR GEMINI UNA VEZ
+# STARTUP: INICIALIZAR GEMINI UNA SOLA VEZ
 # ===========================================================
 @app.on_event("startup")
 def startup_event():
-    """Inicializa el cliente Gemini una sola vez al iniciar el servidor."""
+    """
+    Inicializa el cliente Gemini SOLO una vez al arrancar FastAPI.
+    Evita el error del SDK: '_async_httpx_client'
+    """
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
     if not GEMINI_API_KEY:
@@ -93,36 +80,37 @@ def startup_event():
         print(f"❌ ERROR al inicializar Gemini: {e}")
         chatbot_module.client = None
 
-
 # ===========================================================
-# ENDPOINT PRINCIPAL DE WHATSAPP (TWILIO)
+# ENDPOINT PRINCIPAL PARA WHATSAPP (TWILIO)
 # ===========================================================
 @app.post("/whatsapp")
-async def handle_incoming_message(request: Request):
+async def whatsapp_webhook(request: Request):
 
-    # Twilio envía datos como form-data
+    # Twilio envía los datos en form-data
     form = await request.form()
     incoming_msg = form.get("Body")
     from_number = form.get("From")
 
+    # Si envían vacío, respondemos vacío (Twilio requiere TwiML)
     if not incoming_msg:
         return MessagingResponse()
 
-    # Obtener respuesta de Gemini
+    # Procesar mensaje con Gemini
     ai_reply = get_ai_response(incoming_msg, from_number)
 
     # Crear respuesta TwiML
     resp = MessagingResponse()
     resp.message(ai_reply)
 
+    # Logs
     print(f"📩 Recibido de {from_number}: {incoming_msg}")
     print(f"🤖 Enviado: {ai_reply}")
 
     return resp
 
-
 # ===========================================================
-# ENDPOINT /handle
+# ENDPOINT SECUNDARIO /handle (POST + GET)
 # ===========================================================
 app.add_api_route("/handle", handle, methods=["GET", "POST"])
+
 

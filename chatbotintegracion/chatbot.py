@@ -84,30 +84,29 @@ import os
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError
+
 from .database import collection, obtener_archivo
 
 # --- CONFIGURACIÓN ---
-
 MODELO_GEMINI = "gemini-1.5-flash"
+MAX_CARACTERES_AGRICOLA = 1500 
 MAX_MENSAJES_HISTORIAL = 10
-MAX_CARACTERES_AGRICOLA = 1500
 
-PROMPT_AGRICOLA_BASE = """
-Actúa como un ingeniero agrónomo con más de 20 años de experiencia en agricultura sostenible.
-Analiza los datos proporcionados y brinda recomendaciones prácticas.
-
+PROMPT_AGRICOLA_BASE = """" Actúa como un ingeniero agrónomo con más de 20 años de experiencia en agricultura sostenible y manejo de cultivos. 
+Analiza los datos proporcionados y brinda recomendaciones técnicas claras y prácticas para optimizar la producción agrícola.
 Datos del cultivo:
 - Tipo de cultivo: {tipo_cultivo}
 - Ubicación y clima: {ubicacion_clima}
-
 Tu respuesta debe incluir:
-1. Diagnóstico general.
-2. Recomendaciones técnicas.
-3. Buenas prácticas.
-4. Calendario tentativo.
+1. Diagnóstico general de la situación.
+2. Recomendaciones técnicas para mejorar la productividad.
+3. Sugerencias sostenibles y buenas prácticas agrícolas.
+4. Calendario tentativo de actividades si es posible.
+Usa un lenguaje claro pero técnico, con enfoque práctico y orientado a resultados. contestar en menos de {max_chars} caracteres"""
 
-Responde en menos de {max_chars} caracteres.
-"""
+PROMPT_DOCUMENTOS = "Tu tarea es ayudar a generar documentos legales."
+PROMPT_EXPLICACIONES = "Eres un experto en derecho que explica conceptos legales."
+PROMPT_EDICION = "El usuario desea modificar un documento generado."
 
 PROMPT_AGRICOLA_FINAL = PROMPT_AGRICOLA_BASE.format(
     tipo_cultivo="maíz blanco",
@@ -115,73 +114,71 @@ PROMPT_AGRICOLA_FINAL = PROMPT_AGRICOLA_BASE.format(
     max_chars=MAX_CARACTERES_AGRICOLA
 )
 
-PROMPT_DOCUMENTOS = "Eres un experto creando documentos legales y contratos."
-PROMPT_EXPLICACIONES = "Eres un asesor jurídico experto en explicar términos legales."
-PROMPT_EDICION = "Eres un experto editando documentos legales existentes."
-
-# ========================================================
-# FUNCIÓN PRINCIPAL
-# ========================================================
 
 def get_ai_response(user_message, user_id):
 
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     if not GEMINI_API_KEY:
-        return "Error: Falta la GEMINI_API_KEY."
+        return "Error: falta configurar GEMINI_API_KEY."
 
+    # Cliente Gemini por petición
     client = genai.Client(api_key=GEMINI_API_KEY)
 
     user_message_str = str(user_message).strip()
     user_message_lower = user_message_str.lower()
 
+    # -------- HISTORIAL --------
     mensajes_chat = []
 
-    # --- HISTORIAL ---
     try:
         historial = list(
             collection.find(
                 {"user_id": user_id},
-                {"_id": 0, "role": 1, "content": 1}
+                {"_id":0,"role":1,"content":1}
             ).sort("_id", -1).limit(MAX_MENSAJES_HISTORIAL)
         )
 
         historial_ordenado = historial[::-1]
 
         for msg in historial_ordenado:
+            role = "user" if msg["role"] == "user" else "model"
             mensajes_chat.append(
                 types.Content(
-                    role=msg["role"],
+                    role=role,
                     parts=[types.Part(text=msg["content"])]
                 )
             )
-    except Exception as e:
-        print(f"⚠️ Error al recuperar historial MongoDB: {e}")
 
-    # --- SELECCIÓN DE PROMPT ---
-    if "hacer un contrato" in user_message_lower or "crear documento" in user_message_lower:
+    except Exception as e:
+        print(f"⚠️ Error recuperando historial: {e}")
+
+    # -------- PROMPT --------
+    if "hacer un contrato" in user_message_lower:
         prompt_system = PROMPT_DOCUMENTOS
     elif "qué significa" in user_message_lower or "explica" in user_message_lower:
         prompt_system = PROMPT_EXPLICACIONES
-    elif "editar documento" in user_message_lower:
+    elif "editar" in user_message_lower:
         prompt_system = PROMPT_EDICION
     else:
         prompt_system = PROMPT_AGRICOLA_FINAL
 
-    # --- ARCHIVOS ---
+    # -------- ARCHIVOS --------
     if "contrato de arrendamiento" in user_message_lower:
         archivo = obtener_archivo("Contrato de Arrendamiento")
-        return archivo if archivo else "No encontré el archivo solicitado."
+        return "Aquí tienes tu contrato." if archivo else "No encontré el archivo solicitado."
 
-    # --- MENSAJE ACTUAL ---
+    # -------- MENSAJE ACTUAL --------
     mensajes_chat.append(
-        types.Content(role="user", parts=[types.Part(text=user_message_str)])
+        types.Content(
+            role="user",
+            parts=[types.Part(text=user_message_str)]
+        )
     )
 
     config = types.GenerateContentConfig(system_instruction=prompt_system)
+    answer = "Hubo un error generando respuesta."
 
-    answer = "Hubo un error al generar la respuesta."
-
-    # --- RESPUESTA GEMINI ---
+    # -------- GEMINI --------
     try:
         response = client.models.generate_content(
             model=MODELO_GEMINI,
@@ -189,21 +186,21 @@ def get_ai_response(user_message, user_id):
             config=config
         )
         answer = response.text.strip()
+
     except APIError as e:
         print(f"⚠️ Error API Gemini: {e}")
         answer = "Error en la API de Gemini. Intenta de nuevo."
+
     except Exception as e:
         print(f"⚠️ Error desconocido: {e}")
 
-    # --- GUARDAR HISTORIAL ---
+    # -------- GUARDAR EN BD --------
     try:
         collection.insert_many([
             {"user_id": user_id, "role": "user", "content": user_message_str},
             {"user_id": user_id, "role": "assistant", "content": answer}
         ])
     except Exception as e:
-        print(f"⚠️ Error guardando historial en MongoDB: {e}")
+        print(f"⚠️ Error guardando historial: {e}")
 
     return answer
-
-
