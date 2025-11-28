@@ -39,8 +39,8 @@
 # app.add_api_route("/handle", handle, methods=["POST"])
 
 from fastapi import FastAPI, Request
-from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
+from twilio.rest import Client
 
 from chatbotintegracion.chatbot import get_ai_response
 from chatbotintegracion import chatbot as chatbot_module
@@ -63,7 +63,7 @@ twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"
 
 if not twilio_sid or not twilio_token:
-    print("⚠️ ADVERTENCIA: Twilio no está configurado. WhatsApp no funcionará.")
+    print("⚠️ ADVERTENCIA: Twilio no está completamente configurado.")
     twilio_client = None
 else:
     twilio_client = Client(twilio_sid, twilio_token)
@@ -75,13 +75,13 @@ app = FastAPI()
 
 
 # ===========================================================
-# STARTUP: INICIALIZAR GEMINI (SOLUCIONA BUG)
+# STARTUP: INICIALIZAR GEMINI
 # ===========================================================
 @app.on_event("startup")
 def startup_event():
     """
-    Inicializa el cliente Gemini UNA SOLA vez al iniciar el servidor.
-    Esto elimina el error '_async_httpx_client' del SDK.
+    Inicializa el cliente Gemini UNA sola vez para seguridad,
+    sin usarlo para requests (el cliente final vive en chatbot.py).
     """
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
@@ -91,6 +91,7 @@ def startup_event():
         return
 
     try:
+        # Solo para validar que la API Key funciona
         chatbot_module.client = genai.Client(api_key=GEMINI_API_KEY)
         print("✅ Gemini inicializado correctamente al iniciar el servidor.")
     except Exception as e:
@@ -104,19 +105,18 @@ def startup_event():
 @app.post("/whatsapp")
 async def handle_incoming_message(request: Request):
 
-    # Twilio envía form-data
     form = await request.form()
     incoming_msg = form.get("Body")
     from_number = form.get("From")
 
     if not incoming_msg:
-        # Twilio exige siempre un XML TwiML válido
+        # Twilio siempre exige un XML válido.
         return MessagingResponse()
 
-    # Obtener respuesta automática
+    # 🧠 GENERAR RESPUESTA DE GEMINI
     ai_reply = get_ai_response(incoming_msg, from_number)
 
-    # Crear respuesta TwiML
+    # 📝 Respuesta Twilio
     resp = MessagingResponse()
     resp.message(ai_reply)
 
