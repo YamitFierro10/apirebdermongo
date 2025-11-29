@@ -47,6 +47,8 @@ from twilio.twiml.messaging_response import MessagingResponse
 from chatbotintegracion.chatbot import get_ai_response
 from chatbotintegracion import chatbot as chatbot_module
 from chatbotintegracion.api import handle  # tu handler existente
+from fastapi.responses import Response
+
 
 import os
 from dotenv import load_dotenv
@@ -102,7 +104,8 @@ async def handle_incoming_message(request: Request):
     print(f"📩 Recibido de {from_number}: {incoming_msg}")
     print(f"🤖 Enviado: {ai_reply}")
 
-    return resp
+    return Response(content=str(resp), media_type="application/xml")
+
 
 # mantener /handle (GET y POST)
 app.add_api_route("/handle", handle, methods=["GET", "POST"])
