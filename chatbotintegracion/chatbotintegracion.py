@@ -40,36 +40,29 @@
 
 from fastapi import FastAPI, Request
 from twilio.twiml.messaging_response import MessagingResponse
-from dotenv import load_dotenv
+
 from chatbotintegracion.chatbot import get_ai_response
 from chatbotintegracion.api import handle
 from chatbotintegracion import chatbot as chatbot_module
-from google import genai
-import os
 
-# ===========================================================
-# CARGAR VARIABLES DE ENTORNO
-# ===========================================================
+import os
+from dotenv import load_dotenv
+from google import genai
+
 load_dotenv()
 
-# ===========================================================
-# CONFIGURAR FASTAPI
-# ===========================================================
 app = FastAPI()
 
-# ===========================================================
-# STARTUP: INICIALIZAR GEMINI UNA SOLA VEZ
-# ===========================================================
+
+# ===========================
+# INICIALIZAR GEMINI SOLO 1 VEZ
+# ===========================
 @app.on_event("startup")
 def startup_event():
-    """
-    Inicializa el cliente Gemini SOLO una vez al arrancar FastAPI.
-    Evita el error del SDK: '_async_httpx_client'
-    """
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
     if not GEMINI_API_KEY:
-        print("❌ ERROR: GEMINI_API_KEY no está configurada.")
+        print("❌ GEMINI_API_KEY no configurada.")
         chatbot_module.client = None
         return
 
@@ -77,40 +70,38 @@ def startup_event():
         chatbot_module.client = genai.Client(api_key=GEMINI_API_KEY)
         print("✅ Gemini inicializado correctamente.")
     except Exception as e:
-        print(f"❌ ERROR al inicializar Gemini: {e}")
+        print(f"❌ Error inicializando Gemini: {e}")
         chatbot_module.client = None
 
-# ===========================================================
-# ENDPOINT PRINCIPAL PARA WHATSAPP (TWILIO)
-# ===========================================================
-@app.post("/whatsapp")
-async def whatsapp_webhook(request: Request):
 
-    # Twilio envía los datos en form-data
+# ===========================
+# ENDPOINT WHATSAPP
+# ===========================
+@app.post("/whatsapp")
+async def whatsapp_endpoint(request: Request):
+
     form = await request.form()
     incoming_msg = form.get("Body")
     from_number = form.get("From")
 
-    # Si envían vacío, respondemos vacío (Twilio requiere TwiML)
     if not incoming_msg:
         return MessagingResponse()
 
-    # Procesar mensaje con Gemini
     ai_reply = get_ai_response(incoming_msg, from_number)
 
-    # Crear respuesta TwiML
     resp = MessagingResponse()
     resp.message(ai_reply)
 
-    # Logs
     print(f"📩 Recibido de {from_number}: {incoming_msg}")
     print(f"🤖 Enviado: {ai_reply}")
 
     return resp
 
-# ===========================================================
-# ENDPOINT SECUNDARIO /handle (POST + GET)
-# ===========================================================
+
+# ===========================
+# ENDPOINT /handle
+# ===========================
 app.add_api_route("/handle", handle, methods=["GET", "POST"])
+
 
 
