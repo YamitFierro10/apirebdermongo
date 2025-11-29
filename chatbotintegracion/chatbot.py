@@ -89,7 +89,7 @@ from google.genai.errors import APIError
 from .database import collection, obtener_archivo
 
 # --- CONFIG y CONSTANTES ---
-MODELO_GEMINI = "models/gemini-pro"
+MODELO_GEMINI = "gemini-2.0-flash"
 MAX_CARACTERES_AGRICOLA = 1500
 MAX_MENSAJES_HISTORIAL = 10
 
