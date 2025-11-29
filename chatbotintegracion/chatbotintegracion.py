@@ -38,48 +38,55 @@
 
 # app.add_api_route("/handle", handle, methods=["POST"])
 
+# chatbotintegracion/chatbotintegracion.py
+
 from fastapi import FastAPI, Request
+from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
 
 from chatbotintegracion.chatbot import get_ai_response
-from chatbotintegracion.api import handle
 from chatbotintegracion import chatbot as chatbot_module
+from chatbotintegracion.api import handle  # tu handler existente
 
 import os
 from dotenv import load_dotenv
 from google import genai
 
+# cargar .env (solo local; en producción usa variables de entorno del servicio)
 load_dotenv()
 
-app = FastAPI()
+# Twilio
+twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
+twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
 
+if not twilio_sid or not twilio_token:
+    print("⚠️ ADVERTENCIA: Twilio no está configurado. WhatsApp no funcionará.")
+    twilio_client = None
+else:
+    twilio_client = Client(twilio_sid, twilio_token)
 
-# ===========================
-# INICIALIZAR GEMINI SOLO 1 VEZ
-# ===========================
+app = FastAPI(title="Chatbot Integración")
+
+# startup: (opcional) inicializar cliente genai global si prefieres
+# aquí lo dejamos opcional; chatbot.get_ai_response crea cliente por request
 @app.on_event("startup")
 def startup_event():
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
     if not GEMINI_API_KEY:
         print("❌ GEMINI_API_KEY no configurada.")
         chatbot_module.client = None
-        return
+    else:
+        try:
+            # puedes inicializar global si quieres usar una única instancia:
+            chatbot_module.client = genai.Client(api_key=GEMINI_API_KEY)
+            print("✅ Cliente Gemini inicializado.")
+        except Exception as e:
+            print(f"❌ ERROR al iniciar Gemini: {e}")
+            chatbot_module.client = None
 
-    try:
-        chatbot_module.client = genai.Client(api_key=GEMINI_API_KEY)
-        print("✅ Gemini inicializado correctamente.")
-    except Exception as e:
-        print(f"❌ Error inicializando Gemini: {e}")
-        chatbot_module.client = None
-
-
-# ===========================
-# ENDPOINT WHATSAPP
-# ===========================
 @app.post("/whatsapp")
-async def whatsapp_endpoint(request: Request):
-
+async def handle_incoming_message(request: Request):
     form = await request.form()
     incoming_msg = form.get("Body")
     from_number = form.get("From")
@@ -97,11 +104,14 @@ async def whatsapp_endpoint(request: Request):
 
     return resp
 
-
-# ===========================
-# ENDPOINT /handle
-# ===========================
+# mantener /handle (GET y POST)
 app.add_api_route("/handle", handle, methods=["GET", "POST"])
+
+# health check simple (evita 404 al entrar en /)
+@app.get("/")
+def root():
+    return {"status": "ok"}
+
 
 
 
