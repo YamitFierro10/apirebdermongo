@@ -8,7 +8,7 @@ load_dotenv()
 
 # Conectar a MongoDB
 MONGO_URI = os.getenv("MONGO_URI")
-client_db = MongoClient(MONGO_URI, tls=True, tlsCAFile=None).chatbot_db
+client_db = MongoClient(MONGO_URI).chatbot_db
 #db = client[""]
 
 # GridFS para almacenamiento de archivos
