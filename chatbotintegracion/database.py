@@ -31,4 +31,4 @@ def obtener_archivo(nombre_archivo):
         return archivo.read()  # Devuelve el contenido del archivo
     return None
 
-
+#otro
