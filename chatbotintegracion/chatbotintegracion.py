@@ -87,24 +87,62 @@ def startup_event():
             print(f"❌ ERROR al iniciar Gemini: {e}")
             chatbot_module.client = None
 
+# @app.post("/whatsapp")
+# async def handle_incoming_message(request: Request):
+#     form = await request.form()
+#     incoming_msg = form.get("Body")
+#     from_number = form.get("From")
+
+#     if not incoming_msg:
+#         return MessagingResponse()
+
+#     ai_reply = get_ai_response(incoming_msg, from_number)
+
+#     resp = MessagingResponse()
+#     resp.message(ai_reply)
+
+#     print(f"📩 Recibido de {from_number}: {incoming_msg}")
+#     print(f"🤖 Enviado: {ai_reply}")
+
+#     return Response(content=str(resp), media_type="application/xml")
+
+
 @app.post("/whatsapp")
 async def handle_incoming_message(request: Request):
+
     form = await request.form()
     incoming_msg = form.get("Body")
     from_number = form.get("From")
 
     if not incoming_msg:
-        return MessagingResponse()
+        return MessagingResponse()  # Twilio exige respuesta válida
 
+    # === 1. Generar respuesta con Gemini ===
     ai_reply = get_ai_response(incoming_msg, from_number)
 
-    resp = MessagingResponse()
-    resp.message(ai_reply)
-
+    # === 2. Mostrar en consola ===
     print(f"📩 Recibido de {from_number}: {incoming_msg}")
     print(f"🤖 Enviado: {ai_reply}")
 
-    return Response(content=str(resp), media_type="application/xml")
+    # === 3. Enviar mensaje REAL por WhatsApp ===
+    if twilio_client:
+        try:
+            twilio_client.messages.create(
+                from_=TWILIO_WHATSAPP_NUMBER,
+                to=from_number,
+                body=ai_reply
+            )
+            print("✅ Mensaje enviado a WhatsApp correctamente")
+        except Exception as e:
+            print(f"❌ Error enviando WhatsApp con Twilio: {e}")
+    else:
+        print("⚠️ Twilio no está configurado. No se enviará WhatsApp.")
+
+    # === 4. Enviar respuesta vacía a Twilio ===
+    # (TwiML vacío para evitar errores en el webhook)
+    resp = MessagingResponse()
+    return resp
+
 
 
 # mantener /handle (GET y POST)
