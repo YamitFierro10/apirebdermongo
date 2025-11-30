@@ -2,14 +2,15 @@ from pymongo import MongoClient
 import gridfs
 import os
 from dotenv import load_dotenv
+import certifi
 
 # Cargar variables de entorno
 load_dotenv()
 
 # Conectar a MongoDB
 MONGO_URI = os.getenv("MONGO_URI")
-client_db = MongoClient(MONGO_URI).chatbot_db
-#db = client[""]
+client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+client_db = client["chatbot_db"]
 
 # GridFS para almacenamiento de archivos
 fs = gridfs.GridFS(client_db)
