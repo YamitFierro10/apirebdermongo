@@ -87,26 +87,6 @@ def startup_event():
             print(f"❌ ERROR al iniciar Gemini: {e}")
             chatbot_module.client = None
 
-# @app.post("/whatsapp")
-# async def handle_incoming_message(request: Request):
-#     form = await request.form()
-#     incoming_msg = form.get("Body")
-#     from_number = form.get("From")
-
-#     if not incoming_msg:
-#         return MessagingResponse()
-
-#     ai_reply = get_ai_response(incoming_msg, from_number)
-
-#     resp = MessagingResponse()
-#     resp.message(ai_reply)
-
-#     print(f"📩 Recibido de {from_number}: {incoming_msg}")
-#     print(f"🤖 Enviado: {ai_reply}")
-
-#     return Response(content=str(resp), media_type="application/xml")
-
-
 @app.post("/whatsapp")
 async def handle_incoming_message(request: Request):
 

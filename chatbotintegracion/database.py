@@ -1,22 +1,28 @@
-# from pymongo import MongoClient
-# import gridfs
-# import os
-# from dotenv import load_dotenv
-# import certifi
+from pymongo import MongoClient
+import gridfs
+import os
+from dotenv import load_dotenv
+import certifi
 
-# # Cargar variables de entorno
-# load_dotenv()
+# Cargar variables de entorno
+load_dotenv()
 
-# # Conectar a MongoDB
-# MONGO_URI = os.getenv("MONGO_URI")
-# client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
-# client_db = client["chatbot_db"]
+# Conectar a MongoDB
+MONGO_URI = os.getenv("MONGO_URI")
+client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+client_db = client["chatbot_db"]
 
-# # GridFS para almacenamiento de archivos
-# fs = gridfs.GridFS(client_db)
+# GridFS para almacenamiento de archivos
+fs = gridfs.GridFS(client_db)
 
-# # Colección para historiales de conversación
-# collection = client_db["conversaciones"]
+# Colección para historiales de conversación
+collection = client_db["conversaciones"]
+
+try:
+    client.admin.command("ping")
+    print("✅ Conectado a MongoDB correctamente")
+except Exception as e:
+    print("❌ Error:", e)
 
 # def guardar_archivo(ruta_archivo, nombre_archivo):
 #     """Guarda un archivo en MongoDB GridFS"""
@@ -31,21 +37,4 @@
 #     if archivo:
 #         return archivo.read()  # Devuelve el contenido del archivo
 #     return None
-
-
-from pymongo import MongoClient
-import certifi
-import os
-
-MONGO_URI = os.getenv("MONGO_URI")
-client = MongoClient(MONGO_URI, tls=True, tlsCAFile=certifi.where())
-client_db = client["chatbot_db"]
-
-collection = client_db["conversaciones"]
-
-try:
-    client.admin.command("ping")
-    print("✅ Conectado a MongoDB correctamente")
-except Exception as e:
-    print("❌ Error:", e)
 
