@@ -225,12 +225,16 @@ Tu respuesta debe incluir:
 3. Sugerencias sostenibles y buenas prácticas agrícolas.
 4. Calendario tentativo de actividades si es posible.
 
-Usa un lenguaje claro pero técnico, con enfoque práctico y orientado a resultados. Contestar en menos de {max_chars} caracteres.
+Usa un lenguaje claro pero técnico, orientado a resultados. Máximo {max_chars} caracteres.
 """
 
 PROMPT_DOCUMENTOS = "Tu tarea es ayudar a los usuarios a generar documentos legales como contratos..."
 PROMPT_EXPLICACIONES = "Eres un experto en derecho y asesoras a los usuarios explicando términos legales..."
 PROMPT_EDICION = "El usuario ha solicitado hacer cambios en un documento generado..."
+
+PROMPT_BIENVENIDA = """Puedo ayudarte con recomendaciones agrícolas, explicaciones legales, creación de documentos, análisis de textos, resúmenes y más.
+Dime qué necesitas y con gusto te ayudo. Responde con el tipo de cultivo o tema específico que deseas consultar.
+"""
 
 
 # -------------------------------
@@ -285,8 +289,9 @@ def detectar_ubicacion(mensaje):
     return None
 
 
+
 # -----------------------------------------------------------------
-# 🧠 FUNCION PRINCIPAL DE RESPUESTA IA CON PROMPT AGRICOLA DINÁMICO
+# 🧠 FUNCIÓN PRINCIPAL DE RESPUESTA
 # -----------------------------------------------------------------
 
 def get_ai_response(user_message, user_id):
@@ -314,7 +319,7 @@ def get_ai_response(user_message, user_id):
     except Exception as e:
         print(f"⚠️ Error al recuperar historial MongoDB: {e}")
 
-    # Selección de prompt
+    # SELECCIÓN DE PROMPT
     if "hacer un contrato" in user_message_lower or "crear documento" in user_message_lower:
         prompt_system = PROMPT_DOCUMENTOS
 
@@ -325,24 +330,29 @@ def get_ai_response(user_message, user_id):
         prompt_system = PROMPT_EDICION
 
     else:
-        # 🔥 Aquí activamos las detecciones
-        cultivo = detectar_cultivo(user_message_lower) or "no especificado"
+        # 🔥 Detecciones
+        cultivo = detectar_cultivo(user_message_lower)
         clima = detectar_clima(user_message_lower)
         ubicacion = detectar_ubicacion(user_message_lower)
 
-        ubicacion_clima = (
-            f"Ubicación: {ubicacion if ubicacion else 'no detectada'}, "
-            f"Clima: {clima if clima else 'no detectado'}"
-        )
+        # SI NO HAY NADA AGRÍCOLA → usar prompt de bienvenida
+        if not cultivo and not clima and not ubicacion:
+            prompt_system = PROMPT_BIENVENIDA
+        else:
+            # Prompt agrícola dinámico
+            ubicacion_clima = (
+                f"Ubicación: {ubicacion if ubicacion else 'no detectada'}, "
+                f"Clima: {clima if clima else 'no detectado'}"
+            )
 
-        # Construcción dinámica del prompt
-        prompt_system = PROMPT_AGRICOLA_BASE.format(
-            tipo_cultivo=cultivo,
-            ubicacion_clima=ubicacion_clima,
-            max_chars=MAX_CARACTERES_AGRICOLA
-        )
+            prompt_system = PROMPT_AGRICOLA_BASE.format(
+                tipo_cultivo=cultivo or "no especificado",
+                ubicacion_clima=ubicacion_clima,
+                max_chars=MAX_CARACTERES_AGRICOLA
+            )
 
-    # Archivos
+
+    # Manejo de archivo
     if "contrato de arrendamiento" in user_message_lower:
         archivo = obtener_archivo("Contrato de Arrendamiento")
         return "Aquí tienes tu contrato de arrendamiento. ¿Deseas cambiarlo?" if archivo else "No encontré el archivo solicitado."
@@ -374,6 +384,10 @@ def get_ai_response(user_message, user_id):
         ])
     except Exception as e:
         print(f"⚠️ Error guardando historial en MongoDB: {e}")
+
+    # --- LIMITAR RESPUESTA A 1500 CARACTERES POR TWILIO ---
+    if len(answer) > 1500:
+        answer = answer[:1500] + "..."
 
     return answer
 
