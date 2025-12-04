@@ -80,124 +80,188 @@
 
 #     return answer
 
-# chatbotintegracion/chatbot.py
 
 # import os
 # from google import genai
 # from google.genai import types
 # from google.genai.errors import APIError
-# from .database import collection, obtener_archivo
+# from .database import collection
 
 # # --- CONFIG y CONSTANTES ---
 # MODELO_GEMINI = "gemini-2.0-flash"
 # MAX_CARACTERES_AGRICOLA = 1500
 # MAX_MENSAJES_HISTORIAL = 10
 
-# PROMPT_AGRICOLA_BASE = """" Actúa como un ingeniero agrónomo con más de 20 años de experiencia en agricultura sostenible y manejo de cultivos. 
-# Analiza los datos proporcionados y brinda recomendaciones técnicas claras y prácticas para optimizar la producción agrícola.
-# Datos del cultivo:
-# - Tipo de cultivo: {tipo_cultivo}
+# # --- PROMPT ÚNICO Y CENTRAL ---
+# PROMPT_AGRICOLA = """
+# Eres un ingeniero agrónomo con más de 20 años de experiencia.
+# Responde únicamente sobre agricultura. Si el usuario pide otra cosa,
+# redirígelo amablemente a que especifique un cultivo.
+
+# Reglas:
+# - Enfócate SOLO en el cultivo indicado.
+# - NO cambies el tema.
+# - Máximo {max_chars} caracteres.
+# - Resume si es necesario para no exceder el límite.
+
+# Datos detectados:
+# - Cultivo: {cultivo}
 # - Ubicación y clima: {ubicacion_clima}
-# Tu respuesta debe incluir:
-# 1. Diagnóstico general de la situación.
-# 2. Recomendaciones técnicas para mejorar la productividad.
-# 3. Sugerencias sostenibles y buenas prácticas agrícolas.
-# 4. Calendario tentativo de actividades si es posible.
-# Usa un lenguaje claro pero técnico, con enfoque práctico y orientado a resultados. contestar en menos de {max_chars} caracteres"""
 
-# PROMPT_DOCUMENTOS = "Tu tarea es ayudar a los usuarios a generar documentos legales como contratos..."
-# PROMPT_EXPLICACIONES = "Eres un experto en derecho y asesoras a los usuarios explicando términos legales..."
-# PROMPT_EDICION = "El usuario ha solicitado hacer cambios en un documento generado..."
+# Estructura de la respuesta:
+# 1. Diagnóstico general.
+# 2. Recomendaciones técnicas prácticas.
+# 3. Buenas prácticas sostenibles.
+# 4. Actividades sugeridas si corresponde.
 
-# PROMPT_AGRICOLA_FINAL = PROMPT_AGRICOLA_BASE.format(
-#     tipo_cultivo="maíz blanco",
-#     ubicacion_clima="zona templada, lluvias frecuentes en abril y mayo",
-#     max_chars=MAX_CARACTERES_AGRICOLA
-# )
+# Mensaje del usuario:
+# {mensaje}
+# """
+
+# # -------------------------------------------------------
+# # 🔍 DETECTORES
+# # -------------------------------------------------------
+
+# def detectar_cultivo(mensaje):
+#     cultivos = [
+#         "maíz", "maiz", "arroz", "café", "cafe", "cacao", "plátano", "platano",
+#         "banano", "papa", "yuca", "tomate", "cebolla", "frijol", "soya",
+#         "algodón", "algodon", "trigo", "limón", "lima", "aguacate", "mango",
+#         "hortalizas", "pastos", "caña", "caña de azúcar", "fresa"
+#     ]
+#     msg = mensaje.lower()
+#     for c in cultivos:
+#         if c in msg:
+#             return c
+#     return None
+
+
+# def detectar_clima(mensaje):
+#     climas = {
+#         "clima frío": ["frio", "frío"],
+#         "clima templado": ["templado"],
+#         "clima cálido": ["calido", "cálido", "tropical"],
+#         "lluvias frecuentes": ["lluvia", "lluvioso", "invierno", "llueve"],
+#         "época seca": ["verano", "seco", "sequía"]
+#     }
+#     msg = mensaje.lower()
+#     result = []
+
+#     for nombre, palabras in climas.items():
+#         for p in palabras:
+#             if p in msg:
+#                 result.append(nombre)
+
+#     return ", ".join(result) if result else None
+
+
+# def detectar_ubicacion(mensaje):
+#     ubicaciones = [
+#         "meta", "cundinamarca", "tolima", "huila", "santander",
+#         "nariño", "cauca", "antioquia", "cesar", "magdalena",
+#         "guaviare", "putumayo", "caquetá", "córdoba"
+#     ]
+#     msg = mensaje.lower()
+#     for u in ubicaciones:
+#         if u in msg:
+#             return u.capitalize()
+#     return None
+
+
+# # -------------------------------------------------------
+# # 🧠 GENERADOR PRINCIPAL
+# # -------------------------------------------------------
 
 # def get_ai_response(user_message, user_id):
-#     """
-#     Crea un cliente Gemini por request (evita bug async),
-#     arma historial y prompts en el formato de google-genai,
-#     y guarda el historial en Mongo.
-#     """
 
 #     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 #     if not GEMINI_API_KEY:
-#         return "Error: falta configurar GEMINI_API_KEY en el servidor."
+#         return "Error: falta configurar GEMINI_API_KEY."
 
-#     # crear cliente por petición (estable)
 #     client = genai.Client(api_key=GEMINI_API_KEY)
 
-#     # 1. preparar mensaje
-#     user_message_str = str(user_message).strip()
-#     user_message_lower = user_message_str.lower()
+#     mensaje = str(user_message).strip()
+#     mensaje_lower = mensaje.lower()
 
-#     # 2. recuperar historial desde MongoDB (si existe)
+#     # --- Recuperar historial ---
 #     mensajes_chat = []
 #     try:
 #         historial = list(
 #             collection.find(
-#                 {"user_id": user_id},
-#                 {"_id": 0, "role": 1, "content": 1}
+#                 {"user_id": user_id}, {"_id": 0, "role": 1, "content": 1}
 #             ).sort("_id", -1).limit(MAX_MENSAJES_HISTORIAL)
 #         )
+
 #         historial_ordenado = historial[::-1]
+
 #         for msg in historial_ordenado:
-#             role = "user" if msg.get("role") == "user" else "model"
-#             # Usar keyword 'text' para evitar la ambigüedad de Part.from_text positional
 #             part = types.Part.from_text(text=msg.get("content", ""))
-#             mensajes_chat.append(types.Content(role=role, parts=[part]))
+#             mensajes_chat.append(types.Content(role=msg.get("role"), parts=[part]))
+
 #     except Exception as e:
-#         # Si falla la BD, lo registramos y seguimos sin historial
-#         print(f"⚠️ Error al recuperar historial MongoDB: {e}")
+#         print(f"⚠️ MongoDB historial error: {e}")
 
-#     # 3. seleccionar prompt base
-#     if "hacer un contrato" in user_message_lower or "crear documento" in user_message_lower:
-#         prompt_system = PROMPT_DOCUMENTOS
-#     elif "qué significa" in user_message_lower or "explica" in user_message_lower:
-#         prompt_system = PROMPT_EXPLICACIONES
-#     elif "editar documento" in user_message_lower or "cambiar información" in user_message_lower:
-#         prompt_system = PROMPT_EDICION
-#     else:
-#         prompt_system = PROMPT_AGRICOLA_FINAL
+#     # --- Detectar datos agrícolas ---
+#     cultivo = detectar_cultivo(mensaje_lower)
+#     clima = detectar_clima(mensaje_lower)
+#     ubicacion = detectar_ubicacion(mensaje_lower)
 
-#     # 4. manejo de archivos simple
-#     if "contrato de arrendamiento" in user_message_lower:
-#         archivo = obtener_archivo("Contrato de Arrendamiento")
-#         return "Aquí tienes tu contrato de arrendamiento. ¿Deseas cambiarlo?" if archivo else "No encontré el archivo solicitado."
+#     # Si no hay nada agrícola → pedir cultivo
+#     if not cultivo:
+#         return (
+#             "Para ayudarte como agrónomo, por favor dime el cultivo que deseas consultar "
+#             "(ej: maíz, arroz, tomate, café...)."
+#         )
 
-#     # 5. añadir el mensaje actual
-#     current_part = types.Part.from_text(text=user_message_str)
-#     mensajes_chat.append(types.Content(role="user", parts=[current_part]))
+#     # Construir datos combinados
+#     ubicacion_clima = (
+#         f"Ubicación: {ubicacion if ubicacion else 'no detectada'}, "
+#         f"Clima: {clima if clima else 'no detectado'}"
+#     )
+
+#     # Generar prompt final agrícola
+#     prompt_system = PROMPT_AGRICOLA.format(
+#         cultivo=cultivo,
+#         ubicacion_clima=ubicacion_clima,
+#         max_chars=MAX_CARACTERES_AGRICOLA,
+#         mensaje=mensaje
+#     )
+
+#     # Añadir mensaje actual
+#     mensajes_chat.append(types.Content(
+#         role="user",
+#         parts=[types.Part.from_text(text=mensaje)]
+#     ))
 
 #     config = types.GenerateContentConfig(system_instruction=prompt_system)
 
-#     answer = "Hubo un error generando la respuesta."
+#     # Llamar a Gemini
 #     try:
 #         response = client.models.generate_content(
 #             model=MODELO_GEMINI,
 #             contents=mensajes_chat,
 #             config=config
 #         )
-#         # response.text suele existir con google-genai nuevo
 #         answer = getattr(response, "text", "") or str(response)
-#         answer = answer.strip()
-#     except APIError as e:
-#         print(f"⚠️ Error de API Gemini: {e}")
-#         answer = "Error en la API de Gemini. Intenta de nuevo más tarde."
-#     except Exception as e:
-#         print(f"⚠️ Error desconocido en Gemini: {e}")
-#         answer = "Ocurrió un error al procesar la solicitud."
 
-#     # 6. guardar conversación en Mongo
+#     except Exception as e:
+#         print(f"⚠️ Gemini error: {e}")
+#         answer = "Hubo un problema generando la respuesta."
+
+#     answer = answer.strip()
+
+#     # --- Limitar por Twilio ---
+#     if len(answer) > 1500:
+#         answer = answer[:1500] + "..."
+
+#     # Guardar historial
 #     try:
 #         collection.insert_many([
-#             {"user_id": user_id, "role": "user", "content": user_message_str},
+#             {"user_id": user_id, "role": "user", "content": mensaje},
 #             {"user_id": user_id, "role": "assistant", "content": answer}
 #         ])
 #     except Exception as e:
-#         print(f"⚠️ Error guardando historial en MongoDB: {e}")
+#         print(f"⚠️ Error guardando historial MongoDB: {e}")
 
 #     return answer
 
@@ -207,155 +271,101 @@ from google.genai import types
 from google.genai.errors import APIError
 from .database import collection
 
-# --- CONFIG y CONSTANTES ---
+# --- CONFIG ---
 MODELO_GEMINI = "gemini-2.0-flash"
-MAX_CARACTERES_AGRICOLA = 1500
+MAX_RESPUESTA = 1500
 MAX_MENSAJES_HISTORIAL = 10
 
-# --- PROMPT ÚNICO Y CENTRAL ---
-PROMPT_AGRICOLA = """
-Eres un ingeniero agrónomo con más de 20 años de experiencia.
-Responde únicamente sobre agricultura. Si el usuario pide otra cosa,
-redirígelo amablemente a que especifique un cultivo.
+# --- PROMPT PSICOLOGÍA ---
+PROMPT_PSICOLOGIA = """
+Eres un asistente de apoyo emocional con formación en psicología basada en evidencia.
+Tu función es escuchar, validar emociones y ofrecer estrategias SEGURAS de bienestar como
+respiración, grounding, autocuidado y comunicación asertiva. No das diagnósticos, no eres
+un terapeuta y no sustituyes atención profesional.
 
 Reglas:
-- Enfócate SOLO en el cultivo indicado.
-- NO cambies el tema.
-- Máximo {max_chars} caracteres.
-- Resume si es necesario para no exceder el límite.
-
-Datos detectados:
-- Cultivo: {cultivo}
-- Ubicación y clima: {ubicacion_clima}
-
-Estructura de la respuesta:
-1. Diagnóstico general.
-2. Recomendaciones técnicas prácticas.
-3. Buenas prácticas sostenibles.
-4. Actividades sugeridas si corresponde.
-
-Mensaje del usuario:
-{mensaje}
+1. No uses etiquetas clínicas ni diagnósticos.
+2. No describas ni detalles autolesiones.
+3. Si notas señales de angustia fuerte, valida emociones y sugiere buscar ayuda de un adulto
+   o profesional.
+4. Mantén un tono empático, cálido y claro.
+5. Ofrece técnicas simples y seguras, 1 o 2 máximo.
+6. Nunca des instrucciones técnicas para manejar solo situaciones graves.
 """
 
-# -------------------------------------------------------
-# 🔍 DETECTORES
-# -------------------------------------------------------
+# --- PALABRAS CLAVE PARA DETECTAR CASO CRÍTICO ---
+CRISIS_KEYWORDS = [
+    "no puedo más",
+    "ya no puedo",
+    "me siento muy mal",
+    "estoy desesperado",
+    "nadie me entiende",
+    "me siento solo",
+    "me siento sola",
+    "me siento vacío",
+    "me siento vacía",
+    "quiero rendirme",
+    "todo está mal",
+    "estoy muy triste",
+    "estoy angustiado",
+    "estoy angustiada",
+]
 
-def detectar_cultivo(mensaje):
-    cultivos = [
-        "maíz", "maiz", "arroz", "café", "cafe", "cacao", "plátano", "platano",
-        "banano", "papa", "yuca", "tomate", "cebolla", "frijol", "soya",
-        "algodón", "algodon", "trigo", "limón", "lima", "aguacate", "mango",
-        "hortalizas", "pastos", "caña", "caña de azúcar", "fresa"
-    ]
-    msg = mensaje.lower()
-    for c in cultivos:
-        if c in msg:
-            return c
-    return None
-
-
-def detectar_clima(mensaje):
-    climas = {
-        "clima frío": ["frio", "frío"],
-        "clima templado": ["templado"],
-        "clima cálido": ["calido", "cálido", "tropical"],
-        "lluvias frecuentes": ["lluvia", "lluvioso", "invierno", "llueve"],
-        "época seca": ["verano", "seco", "sequía"]
-    }
-    msg = mensaje.lower()
-    result = []
-
-    for nombre, palabras in climas.items():
-        for p in palabras:
-            if p in msg:
-                result.append(nombre)
-
-    return ", ".join(result) if result else None
+# URL de apoyo emocional
+URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psychology&city_name=bogota&utm_medium=ppc&utm_source=google&utm_term=terapia%20psicologica&utm_campaign=Search+Assistant&hsa_acc=4819731923&hsa_cam=23023263818&hsa_grp=188327324791&hsa_ad=774254082187&hsa_src=g&hsa_tgt=kwd-295520139042&hsa_kw=terapia%20psicologica&hsa_mt=e&hsa_net=adwords&hsa_ver=3&gad_source=1&gad_campaignid=23023263818&gbraid=0AAAAACSgYvorMUHTzf7_jEEQHUjRRMJFa&gclid=CjwKCAiA3L_JBhAlEiwAlcWO5yIm7r8WLrWcOWpQrejRs50Ykd-6tfVY0HP-_3Ch4vlOwd0G-7CnehoCSMMQAvD_BwE"
 
 
-def detectar_ubicacion(mensaje):
-    ubicaciones = [
-        "meta", "cundinamarca", "tolima", "huila", "santander",
-        "nariño", "cauca", "antioquia", "cesar", "magdalena",
-        "guaviare", "putumayo", "caquetá", "córdoba"
-    ]
-    msg = mensaje.lower()
-    for u in ubicaciones:
-        if u in msg:
-            return u.capitalize()
-    return None
-
-
-# -------------------------------------------------------
-# 🧠 GENERADOR PRINCIPAL
-# -------------------------------------------------------
+# -----------------------------------------------------------------
+# 🧠 FUNCIÓN PRINCIPAL
+# -----------------------------------------------------------------
 
 def get_ai_response(user_message, user_id):
 
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     if not GEMINI_API_KEY:
-        return "Error: falta configurar GEMINI_API_KEY."
+        return "Error: falta configurar GEMINI_API_KEY en el servidor."
 
     client = genai.Client(api_key=GEMINI_API_KEY)
 
-    mensaje = str(user_message).strip()
-    mensaje_lower = mensaje.lower()
+    user_message_str = str(user_message).strip().lower()
 
-    # --- Recuperar historial ---
+    # 1. DETECCIÓN DE CASO CRÍTICO
+    if any(p in user_message_str for p in CRISIS_KEYWORDS):
+        return (
+            "Siento que estás pasando por un momento difícil. No tienes que enfrentarlo a solas. "
+            "Habla con un adulto de confianza o un profesional. También puedes buscar apoyo aquí:\n\n"
+            f"{URL_APOYO}"
+        )
+
+    # 2. Cargar historial
     mensajes_chat = []
     try:
         historial = list(
-            collection.find(
-                {"user_id": user_id}, {"_id": 0, "role": 1, "content": 1}
-            ).sort("_id", -1).limit(MAX_MENSAJES_HISTORIAL)
+            collection.find({"user_id": user_id}, {"_id": 0, "role": 1, "content": 1})
+            .sort("_id", -1).limit(MAX_MENSAJES_HISTORIAL)
         )
-
         historial_ordenado = historial[::-1]
 
         for msg in historial_ordenado:
             part = types.Part.from_text(text=msg.get("content", ""))
-            mensajes_chat.append(types.Content(role=msg.get("role"), parts=[part]))
+            role = "user" if msg["role"] == "user" else "model"
+            mensajes_chat.append(types.Content(role=role, parts=[part]))
 
     except Exception as e:
-        print(f"⚠️ MongoDB historial error: {e}")
+        print(f"⚠️ Error historial: {e}")
 
-    # --- Detectar datos agrícolas ---
-    cultivo = detectar_cultivo(mensaje_lower)
-    clima = detectar_clima(mensaje_lower)
-    ubicacion = detectar_ubicacion(mensaje_lower)
+    # 3. Utilizar el prompt psicológico
+    prompt_system = PROMPT_PSICOLOGIA
 
-    # Si no hay nada agrícola → pedir cultivo
-    if not cultivo:
-        return (
-            "Para ayudarte como agrónomo, por favor dime el cultivo que deseas consultar "
-            "(ej: maíz, arroz, tomate, café...)."
-        )
-
-    # Construir datos combinados
-    ubicacion_clima = (
-        f"Ubicación: {ubicacion if ubicacion else 'no detectada'}, "
-        f"Clima: {clima if clima else 'no detectado'}"
-    )
-
-    # Generar prompt final agrícola
-    prompt_system = PROMPT_AGRICOLA.format(
-        cultivo=cultivo,
-        ubicacion_clima=ubicacion_clima,
-        max_chars=MAX_CARACTERES_AGRICOLA,
-        mensaje=mensaje
-    )
-
-    # Añadir mensaje actual
+    # 4. Agregar mensaje actual
     mensajes_chat.append(types.Content(
         role="user",
-        parts=[types.Part.from_text(text=mensaje)]
+        parts=[types.Part.from_text(text=user_message_str)]
     ))
 
     config = types.GenerateContentConfig(system_instruction=prompt_system)
 
-    # Llamar a Gemini
+    # 5. Generar respuesta
     try:
         response = client.models.generate_content(
             model=MODELO_GEMINI,
@@ -365,26 +375,23 @@ def get_ai_response(user_message, user_id):
         answer = getattr(response, "text", "") or str(response)
 
     except Exception as e:
-        print(f"⚠️ Gemini error: {e}")
-        answer = "Hubo un problema generando la respuesta."
+        print(f"⚠️ Error generando respuesta: {e}")
+        answer = "Ocurrió un error procesando tu solicitud."
 
-    answer = answer.strip()
+    # 6. Limitar respuesta (antes de guardar)
+    if len(answer) > MAX_RESPUESTA:
+        answer = answer[:MAX_RESPUESTA] + "..."
 
-    # --- Limitar por Twilio ---
-    if len(answer) > 1500:
-        answer = answer[:1500] + "..."
-
-    # Guardar historial
+    # 7. Guardar historial
     try:
         collection.insert_many([
-            {"user_id": user_id, "role": "user", "content": mensaje},
+            {"user_id": user_id, "role": "user", "content": user_message},
             {"user_id": user_id, "role": "assistant", "content": answer}
         ])
     except Exception as e:
-        print(f"⚠️ Error guardando historial MongoDB: {e}")
+        print(f"⚠️ Error guardando historial: {e}")
 
     return answer
-
 
 
 
