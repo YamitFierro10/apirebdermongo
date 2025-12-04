@@ -278,19 +278,28 @@ MAX_MENSAJES_HISTORIAL = 10
 
 # --- PROMPT PSICOLOGÍA ---
 PROMPT_PSICOLOGIA = """
-Eres un asistente de apoyo emocional con formación en psicología basada en evidencia.
-Tu función es escuchar, validar emociones y ofrecer estrategias SEGURAS de bienestar como
-respiración, grounding, autocuidado y comunicación asertiva. No das diagnósticos, no eres
-un terapeuta y no sustituyes atención profesional.
+Eres un asistente de apoyo emocional diseñado especialmente para acompañar a personas jóvenes.
+Tu rol es escuchar, validar y ofrecer estrategias seguras y sencillas de bienestar como respiración,
+grounding, autocuidado y comunicación asertiva. No das diagnósticos, no describes autolesiones
+y no sustituyes apoyo profesional.
 
 Reglas:
-1. No uses etiquetas clínicas ni diagnósticos.
-2. No describas ni detalles autolesiones.
-3. Si notas señales de angustia fuerte, valida emociones y sugiere buscar ayuda de un adulto
-   o profesional.
-4. Mantén un tono empático, cálido y claro.
-5. Ofrece técnicas simples y seguras, 1 o 2 máximo.
-6. Nunca des instrucciones técnicas para manejar solo situaciones graves.
+1. Usa un tono cálido, empático, cercano y claro.
+2. No utilices etiquetas clínicas ni diagnósticos.
+3. No describas ni detalles autolesiones en ningún contexto.
+4. Si notas angustia alta, valida, acompaña y anima a buscar ayuda de un adulto o profesional.
+5. Ofrece máximo 1 o 2 técnicas simples por respuesta.
+6. Tu prioridad es que la persona se sienta escuchada y acompañada.
+"""
+
+# --- MENSAJE DE BIENVENIDA (cuando no se detecta intención clara) ---
+MENSAJE_BIENVENIDA = """
+Estoy aquí para escucharte y acompañarte. Si tienes algo en mente, si te sientes confundido,
+triste, abrumado o simplemente quieres desahogarte, puedes hacerlo conmigo. Este es un espacio
+seguro para ti.
+
+Puedo ayudarte a explorar cómo te sientes, validar tus emociones y compartirte técnicas simples
+para sentirte un poco mejor. ¿Cómo te has estado sintiendo hoy?
 """
 
 # --- PALABRAS CLAVE PARA DETECTAR CASO CRÍTICO ---
@@ -299,6 +308,7 @@ CRISIS_KEYWORDS = [
     "ya no puedo",
     "me siento muy mal",
     "estoy desesperado",
+    "estoy desesperada",
     "nadie me entiende",
     "me siento solo",
     "me siento sola",
@@ -311,8 +321,8 @@ CRISIS_KEYWORDS = [
     "estoy angustiada",
 ]
 
-# URL de apoyo emocional
-URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psychology&city_name=bogota&utm_medium=ppc&utm_source=google&utm_term=terapia%20psicologica&utm_campaign=Search+Assistant&hsa_acc=4819731923&hsa_cam=23023263818&hsa_grp=188327324791&hsa_ad=774254082187&hsa_src=g&hsa_tgt=kwd-295520139042&hsa_kw=terapia%20psicologica&hsa_mt=e&hsa_net=adwords&hsa_ver=3&gad_source=1&gad_campaignid=23023263818&gbraid=0AAAAACSgYvorMUHTzf7_jEEQHUjRRMJFa&gclid=CjwKCAiA3L_JBhAlEiwAlcWO5yIm7r8WLrWcOWpQrejRs50Ykd-6tfVY0HP-_3Ch4vlOwd0G-7CnehoCSMMQAvD_BwE"
+# --- URL DE APOYO ---
+URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psychology"
 
 
 # -----------------------------------------------------------------
@@ -332,8 +342,9 @@ def get_ai_response(user_message, user_id):
     # 1. DETECCIÓN DE CASO CRÍTICO
     if any(p in user_message_str for p in CRISIS_KEYWORDS):
         return (
-            "Siento que estás pasando por un momento difícil. No tienes que enfrentarlo a solas. "
-            "Habla con un adulto de confianza o un profesional. También puedes buscar apoyo aquí:\n\n"
+            "Siento que estás pasando por un momento muy difícil y no tienes que enfrentar eso solo/a. "
+            "Hablar con un adulto de confianza o un profesional puede ayudarte muchísimo. "
+            "Si puedes, busca apoyo ahora mismo. También puedes encontrar ayuda aquí:\n\n"
             f"{URL_APOYO}"
         )
 
@@ -354,10 +365,14 @@ def get_ai_response(user_message, user_id):
     except Exception as e:
         print(f"⚠️ Error historial: {e}")
 
-    # 3. Utilizar el prompt psicológico
+    # 3. Si solo saludan o no hay intención clara → mensaje de bienvenida
+    if user_message_str in ["hola", "buenas", "hey", "qué haces", "que haces", "holi", "ola"]:
+        return MENSAJE_BIENVENIDA.strip()
+
+    # 4. Usar prompt psicológico
     prompt_system = PROMPT_PSICOLOGIA
 
-    # 4. Agregar mensaje actual
+    # 5. Agregar mensaje actual
     mensajes_chat.append(types.Content(
         role="user",
         parts=[types.Part.from_text(text=user_message_str)]
@@ -365,7 +380,7 @@ def get_ai_response(user_message, user_id):
 
     config = types.GenerateContentConfig(system_instruction=prompt_system)
 
-    # 5. Generar respuesta
+    # 6. Generar respuesta
     try:
         response = client.models.generate_content(
             model=MODELO_GEMINI,
@@ -376,13 +391,13 @@ def get_ai_response(user_message, user_id):
 
     except Exception as e:
         print(f"⚠️ Error generando respuesta: {e}")
-        answer = "Ocurrió un error procesando tu solicitud."
+        answer = "Hubo un problema al procesar lo que dijiste, pero aquí estoy para escucharte."
 
-    # 6. Limitar respuesta (antes de guardar)
+    # 7. Limitar respuesta (antes de guardar)
     if len(answer) > MAX_RESPUESTA:
         answer = answer[:MAX_RESPUESTA] + "..."
 
-    # 7. Guardar historial
+    # 8. Guardar historial
     try:
         collection.insert_many([
             {"user_id": user_id, "role": "user", "content": user_message},
@@ -392,6 +407,7 @@ def get_ai_response(user_message, user_id):
         print(f"⚠️ Error guardando historial: {e}")
 
     return answer
+
 
 
 
