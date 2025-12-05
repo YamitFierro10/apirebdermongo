@@ -276,57 +276,44 @@ MODELO_GEMINI = "gemini-2.0-flash"
 MAX_RESPUESTA = 1500
 MAX_MENSAJES_HISTORIAL = 10
 
-# --- PROMPT PSICOLOGÍA (mejorado) ---
+# --- PROMPT PSICOLOGÍA (respuestas más cortas y conversadas) ---
 PROMPT_PSICOLOGIA = """
-Eres un asistente de apoyo emocional con un estilo cálido, humano y cercano,
-como un buen amigo que sabe escuchar. No das diagnósticos, no eres terapeuta
-y no reemplazas atención profesional.
+Eres un asistente de apoyo emocional con un estilo cálido, cercano y tranquilo.
+Hablas como un amigo que sabe escuchar, sin ser técnico ni distante.
+No eres terapeuta y no das diagnósticos.
 
-Tu objetivo es acompañar, validar emociones y ayudar a la persona a sentirse un poco mejor.
-Da respuestas cortas, suaves y empáticas (máximo 3–4 frases).
+Objetivo:
+Acompaña, calma, valida emociones y ayuda a que la persona se sienta un poco mejor.
+Responde siempre de forma breve: 2 o 3 frases máximo.
+Usa lenguaje sencillo, humano y amable.
 
 Reglas:
-1. Sé breve y natural, sin tecnicismos.
-2. Valida emociones con calidez.
-3. No uses etiquetas clínicas.
-4. No describas autolesiones.
-5. Ofrece solo técnicas simples: respiración, grounding, pausa, reflexión.
-6. Mantén un tono tranquilo y cercano.
-7. Si notas angustia intensa, valida y sugiere buscar ayuda de un adulto o profesional.
+1. Respuestas cortas, naturales y conversadas.
+2. Valida lo que la persona siente sin juzgar.
+3. Nada de etiquetas clínicas.
+4. Nada de contenido sensible o detallado.
+5. Ofrece apoyo suave: respiración, pausa, grounding, desahogo.
+6. Mantén un tono de amigo que está presente y escucha.
+7. Si notas mucha angustia, invita a buscar apoyo de un adulto o profesional.
 """
 
-# ⚠️ PALABRAS CLAVE DE CRISIS (sin mencionar autolesión)
+# ⚠️ PALABRAS CLAVE DE CRISIS (sin términos explícitos)
 CRISIS_KEYWORDS = [
-    "no puedo más",
-    "ya no puedo",
-    "me siento muy mal",
-    "estoy muy mal",
-    "estoy al límite",
-    "me siento desesperado",
-    "me siento desesperada",
-    "no tengo fuerzas",
-    "nadie me entiende",
-    "estoy desbordado",
-    "estoy desbordada",
-    "me siento solo",
-    "me siento sola",
-    "me siento vacío",
-    "me siento vacía",
-    "quiero rendirme",
-    "todo está mal",
-    "estoy muy triste",
-    "estoy angustiado",
-    "estoy angustiada",
-    "no veo salida",
-    "me cuesta seguir",
-    "siento mucha presión",
-    "no sé qué hacer",
+    "no puedo más", "ya no puedo", "me siento muy mal", "estoy muy mal",
+    "estoy al límite", "me siento desesperado", "me siento desesperada",
+    "no tengo fuerzas", "nadie me entiende", "estoy desbordado",
+    "estoy desbordada", "me siento solo", "me siento sola",
+    "me siento vacío", "me siento vacía", "quiero rendirme", "todo está mal",
+    "estoy muy triste", "estoy angustiado", "estoy angustiada",
+    "no veo salida", "me cuesta seguir", "siento mucha presión",
+    "no sé qué hacer", "me siento perdido", "me siento perdida",
+    "ya no doy más", "me siento mal emocionalmente",
+    "me siento sin rumbo", "me siento sin ganas", "dirijame con un asesor"
 ]
 
-# URL de apoyo emocional
-URL_APOYO = (
-    "https://www.doctoralia.co/search-assistant?specialization_name=psychology&city_name=bogota"
-)
+# URL para redirigir casos críticos
+URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psychology&city_name=bogota"
+
 
 # -----------------------------------------------------------------
 # 🧠 FUNCIÓN PRINCIPAL
@@ -345,10 +332,9 @@ def get_ai_response(user_message, user_id):
     # --- 1. Detectar caso crítico ---
     if any(p in user_message_str for p in CRISIS_KEYWORDS):
         return (
-            "Siento que estás pasando por un momento que se siente muy pesado. "
-            "No tienes que cargar todo esto solo. Hablar con un adulto de confianza "
-            "o un profesional podría ayudarte mucho. También puedes buscar apoyo aquí:\n\n"
-            f"{URL_APOYO}"
+            "Siento que estás pasando por algo muy duro. No tienes por qué llevarlo solo. "
+            "Hablar con alguien de confianza o un profesional podría ayudarte mucho. "
+            f"Si quieres, aquí puedes buscar apoyo:\n{URL_APOYO}"
         )
 
     # --- 2. Recuperar historial ---
@@ -369,7 +355,7 @@ def get_ai_response(user_message, user_id):
     except Exception as e:
         print(f"⚠️ Error recuperando historial: {e}")
 
-    # --- 3. Agregar el mensaje actual ---
+    # --- 3. Agregar mensaje del usuario ---
     mensajes_chat.append(
         types.Content(
             role="user",
@@ -377,7 +363,7 @@ def get_ai_response(user_message, user_id):
         )
     )
 
-    # --- 4. Configurar prompt psicológico ---
+    # --- 4. Configurar prompt ---
     config = types.GenerateContentConfig(system_instruction=PROMPT_PSICOLOGIA)
 
     # --- 5. Generar respuesta ---
@@ -391,9 +377,9 @@ def get_ai_response(user_message, user_id):
 
     except Exception as e:
         print(f"⚠️ Error generando respuesta: {e}")
-        answer = "Hubo un problema procesando tu mensaje."
+        answer = "Tu mensaje es importante, pero hubo un error procesándolo."
 
-    # --- 6. Limitar respuesta a 1500 caracteres ---
+    # --- 6. Limitar a 1500 caracteres ---
     answer = answer.strip()
     if len(answer) > MAX_RESPUESTA:
         answer = answer[:MAX_RESPUESTA] + "..."
