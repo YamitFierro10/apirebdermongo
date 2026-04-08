@@ -39,20 +39,22 @@
 # app.add_api_route("/handle", handle, methods=["POST"])
 
 # chatbotintegracion/chatbotintegracion.py
+# 🔹 1. Librerías estándar de Python
+import os
 
+# 🔹 2. Librerías externas (instaladas con pip)
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
+from fastapi.responses import Response
 from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
+from google import genai
+
+# 🔹 3. Importaciones de tu proyecto (first party)
 
 from chatbotintegracion.chatbot import get_ai_response
 from chatbotintegracion import chatbot as chatbot_module
 from chatbotintegracion.api import handle  # tu handler existente
-from fastapi.responses import Response
-
-
-import os
-from dotenv import load_dotenv
-from google import genai
 
 # cargar .env (solo local; en producción usa variables de entorno del servicio)
 load_dotenv()
@@ -132,7 +134,3 @@ app.add_api_route("/handle", handle, methods=["GET", "POST"])
 @app.get("/")
 def root():
     return {"status": "ok"}
-
-
-
-
