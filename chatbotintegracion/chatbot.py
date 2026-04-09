@@ -275,7 +275,7 @@ from .database import collection
 client = None
 
 # --- CONFIG ---
-MODELO_GEMINI = "gemini-2.0-flash"
+MODELO_GEMINI = "gemini-2.5-flash"
 MAX_RESPUESTA = 1500
 MAX_MENSAJES_HISTORIAL = 10
 
