@@ -39,10 +39,9 @@
 # app.add_api_route("/handle", handle, methods=["POST"])
 
 # chatbotintegracion/chatbotintegracion.py
-# 🔹 1. Librerías estándar de Python
 import os
+from contextlib import asynccontextmanager
 
-# 🔹 2. Librerías externas (instaladas con pip)
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
@@ -50,87 +49,68 @@ from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
 from google import genai
 
-# 🔹 3. Importaciones de tu proyecto (first party)
-
 from chatbotintegracion.chatbot import get_ai_response
 from chatbotintegracion import chatbot as chatbot_module
-from chatbotintegracion.api import handle  # tu handler existente
+from chatbotintegracion.api import handle
 
-# cargar .env (solo local; en producción usa variables de entorno del servicio)
 load_dotenv()
 
-# Twilio
+# 🔹 Twilio config
 twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
 twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
 
-if not twilio_sid or not twilio_token:
-    print("⚠️ ADVERTENCIA: Twilio no está configurado. WhatsApp no funcionará.")
-    twilio_client = None
-else:
-    twilio_client = Client(twilio_sid, twilio_token)
+twilio_client = Client(twilio_sid, twilio_token) if twilio_sid and twilio_token else None
 
-app = FastAPI(title="Chatbot Integración")
-
-# startup: (opcional) inicializar cliente genai global si prefieres
-# aquí lo dejamos opcional; chatbot.get_ai_response crea cliente por request
-@app.on_event("startup")
-def startup_event():
+# 🔹 Lifespan (reemplaza on_event)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
     if not GEMINI_API_KEY:
         print("❌ GEMINI_API_KEY no configurada.")
         chatbot_module.client = None
     else:
         try:
-            # puedes inicializar global si quieres usar una única instancia:
             chatbot_module.client = genai.Client(api_key=GEMINI_API_KEY)
             print("✅ Cliente Gemini inicializado.")
         except Exception as e:
             print(f"❌ ERROR al iniciar Gemini: {e}")
             chatbot_module.client = None
 
+    yield
+
+    print("🔒 Cerrando aplicación...")
+
+app = FastAPI(title="Chatbot Integración", lifespan=lifespan)
+
+# 🔹 Webhook WhatsApp
 @app.post("/whatsapp")
 async def handle_incoming_message(request: Request):
-
     form = await request.form()
     incoming_msg = form.get("Body")
     from_number = form.get("From")
 
-    if not incoming_msg:
-        return MessagingResponse()  # Twilio exige respuesta válida
+    resp = MessagingResponse()
 
-    # === 1. Generar respuesta con Gemini ===
+    if not incoming_msg:
+        resp.message("No recibí mensaje 🤔")
+        return Response(content=str(resp), media_type="application/xml")
+
+    # IA
     ai_reply = get_ai_response(incoming_msg, from_number)
 
-    # === 2. Mostrar en consola ===
-    print(f"📩 Recibido de {from_number}: {incoming_msg}")
-    print(f"🤖 Enviado: {ai_reply}")
+    print(f"📩 {from_number}: {incoming_msg}")
+    print(f"🤖 {ai_reply}")
 
-    # === 3. Enviar mensaje REAL por WhatsApp ===
-    if twilio_client:
-        try:
-            twilio_client.messages.create(
-                from_=TWILIO_WHATSAPP_NUMBER,
-                to=from_number,
-                body=ai_reply
-            )
-            print("✅ Mensaje enviado a WhatsApp correctamente")
-        except Exception as e:
-            print(f"❌ Error enviando WhatsApp con Twilio: {e}")
-    else:
-        print("⚠️ Twilio no está configurado. No se enviará WhatsApp.")
+    # 👉 SOLO UNA forma de responder (RECOMENDADO)
+    resp.message(ai_reply)
 
-    # === 4. Enviar respuesta vacía a Twilio ===
-    # (TwiML vacío para evitar errores en el webhook)
-    resp = MessagingResponse()
-    return resp
+    return Response(content=str(resp), media_type="application/xml")
 
-
-
-# mantener /handle (GET y POST)
+# 🔹 Rutas adicionales
 app.add_api_route("/handle", handle, methods=["GET", "POST"])
 
-# health check simple (evita 404 al entrar en /)
 @app.get("/")
 def root():
     return {"status": "ok"}

@@ -37,4 +37,3 @@ def obtener_archivo(nombre_archivo):
     if archivo:
         return archivo.read()  # Devuelve el contenido del archivo
     return None
-
