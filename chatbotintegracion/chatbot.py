@@ -269,6 +269,7 @@ import os
 from google import genai
 from google.genai import types
 from .database import collection
+import traceback
 
 # --- CONFIG ---
 MODELO_GEMINI = "gemini-2.0-flash"
@@ -385,41 +386,36 @@ URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psyc
 
 def get_ai_response(user_message, user_id):
 
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    if not GEMINI_API_KEY:
-        return "Error: falta configurar GEMINI_API_KEY en el servidor."
+    client = chatbot_module.client
 
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    if not client:
+        return "Error: el servicio de IA no está disponible en este momento."
 
     user_message_str = str(user_message).strip().lower()
 
-    # --- 1. Detectar caso crítico ---
     if any(p in user_message_str for p in CRISIS_KEYWORDS):
         return (
             "Siento que estás pasando por algo muy duro. No tienes por qué llevarlo solo. "
-            "Hablar con alguien de confianza o un profesional podría ayudarte mucho. "
-            f"Si quieres, aquí puedes buscar apoyo:\n{URL_APOYO}"
+            f"Aquí puedes buscar apoyo:\n{URL_APOYO}"
         )
 
-    # --- 2. Recuperar historial ---
     mensajes_chat = []
 
     try:
         historial = list(
-            collection.find({"user_id": user_id}, {"_id": 0, "role": 1, "content": 1})
+            collection.find({"user_id": user_id}, {"role": 1, "content": 1})
             .sort("_id", -1)
             .limit(MAX_MENSAJES_HISTORIAL)
         )
-        historial_ordenado = historial[::-1]
 
-        for msg in historial_ordenado:
+        for msg in historial[::-1]:
             part = types.Part.from_text(text=msg.get("content", ""))
             role = "user" if msg["role"] == "user" else "model"
             mensajes_chat.append(types.Content(role=role, parts=[part]))
-    except Exception as e:
-        print(f"⚠️ Error recuperando historial: {e}")
 
-    # --- 3. Agregar mensaje del usuario ---
+    except Exception:
+        traceback.print_exc()
+
     mensajes_chat.append(
         types.Content(
             role="user",
@@ -427,35 +423,21 @@ def get_ai_response(user_message, user_id):
         )
     )
 
-    # --- 4. Configurar prompt ---
-    config = types.GenerateContentConfig(system_instruction=PROMPT_PSICOLOGIA)
-
-    # --- 5. Generar respuesta ---
     try:
         response = client.models.generate_content(
             model=MODELO_GEMINI,
             contents=mensajes_chat,
-            config=config
+            config=types.GenerateContentConfig(system_instruction=PROMPT_PSICOLOGIA)
         )
-        answer = getattr(response, "text", "") or str(response)
 
-    except Exception as e:
-        print(f"⚠️ Error generando respuesta: {e}")
+        try:
+            answer = response.text
+        except:
+            answer = str(response)
+
+    except Exception:
+        traceback.print_exc()
         answer = "Tu mensaje es importante, pero hubo un error procesándolo."
-
-    # --- 6. Limitar a 1500 caracteres ---
-    answer = answer.strip()
-    if len(answer) > MAX_RESPUESTA:
-        answer = answer[:MAX_RESPUESTA] + "..."
-
-    # --- 7. Guardar historial ---
-    try:
-        collection.insert_many([
-            {"user_id": user_id, "role": "user", "content": user_message},
-            {"user_id": user_id, "role": "assistant", "content": answer}
-        ])
-    except Exception as e:
-        print(f"⚠️ Error guardando historial: {e}")
 
     return answer
 
