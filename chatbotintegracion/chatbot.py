@@ -266,10 +266,13 @@
 #     return answer
 
 import os
+import traceback
 from google import genai
 from google.genai import types
 from .database import collection
-import traceback
+
+# 👇 MUY IMPORTANTE
+client = None
 
 # --- CONFIG ---
 MODELO_GEMINI = "gemini-2.0-flash"
@@ -386,7 +389,7 @@ URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psyc
 
 def get_ai_response(user_message, user_id):
 
-    client = chatbot_module.client
+    global client
 
     if not client:
         return "Error: el servicio de IA no está disponible en este momento."
@@ -440,7 +443,3 @@ def get_ai_response(user_message, user_id):
         answer = "Tu mensaje es importante, pero hubo un error procesándolo."
 
     return answer
-
-
-
-
