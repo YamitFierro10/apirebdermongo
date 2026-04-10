@@ -11,7 +11,7 @@ from google import genai
 
 from chatbotintegracion.chatbot import get_ai_response
 from chatbotintegracion import chatbot as chatbot_module
-from chatbotintegracion.database import collection
+from chatbotintegracion.database import get_collection
 from datetime import datetime
 
 load_dotenv()
@@ -45,45 +45,61 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Chatbot Integración", lifespan=lifespan)
 
+
 def procesar_mensaje(mensaje, numero):
     try:
         print("🔥 Procesando mensaje")
 
-        print("📦 Collection:", collection)
+        # 🔌 obtener colección (auto-reconecta)
+        col = get_collection()
 
-        # 🔴 PRUEBA DIRECTA A MONGO
-        test = collection.insert_one({
-            "test": "conexion",
-        })
+        print("📦 Collection:", col)
 
-        print("✅ Insert test:", test.inserted_id)
+        if col is None:
+            print("❌ No hay conexión a MongoDB")
+        
+        else:
+            # 🧪 TEST
+            test = col.insert_one({"test": "ok"})
+            print("✅ TEST:", test.inserted_id)
 
-        # IA
+            # 👤 guardar mensaje usuario
+            col.insert_one({
+                "usuario": numero,
+                "mensaje": mensaje,
+                "tipo": "usuario",
+                "timestamp": datetime.utcnow()
+            })
+
+            print("💾 Usuario guardado")
+
+        # 🧠 IA (esto SIEMPRE debe ejecutarse aunque falle Mongo)
         ai_reply = get_ai_response(mensaje, numero)
 
-        # guardar usuario
-        collection.insert_one({
-            "usuario": numero,
-            "mensaje": mensaje,
-            "tipo": "usuario"
-        })
+        print("🤖 IA:", ai_reply)
 
-        # guardar bot
-        collection.insert_one({
-            "usuario": numero,
-            "mensaje": ai_reply,
-            "tipo": "bot"
-        })
+        # 🔌 volver a intentar guardar respuesta
+        if col:
+            col.insert_one({
+                "usuario": numero,
+                "mensaje": ai_reply,
+                "tipo": "bot",
+                "timestamp": datetime.utcnow()
+            })
 
-        # enviar mensaje
+            print("💾 Bot guardado")
+
+        # 📤 enviar mensaje
         twilio_client.messages.create(
             body=ai_reply,
             from_=TWILIO_WHATSAPP_NUMBER,
             to=numero
         )
 
+        print("📤 Mensaje enviado")
+
     except Exception as e:
-        print("❌ ERROR MONGO:", e)
+        print("❌ ERROR GENERAL:", e)
 
         
 # 🔹 Webhook WhatsApp
