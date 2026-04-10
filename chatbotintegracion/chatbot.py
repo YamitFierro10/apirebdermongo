@@ -1,4 +1,5 @@
 import os
+import time
 import traceback
 from google import genai
 from google.genai import types
@@ -115,6 +116,21 @@ CRISIS_KEYWORDS = [
 # URL para redirigir casos críticos
 URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psychology&city_name=bogota"
 
+def generar_respuesta_con_retry(client, mensajes_chat, config):
+    for intento in range(3):
+        try:
+            response = client.models.generate_content(
+                model=MODELO_GEMINI,
+                contents=mensajes_chat,
+                config=config
+            )
+            return response.text
+
+        except Exception as e:
+            print(f"❌ Intento {intento+1} falló:", e)
+            time.sleep(2)
+
+    return "Tu mensaje es importante, pero hubo un error procesándolo."
 
 # -----------------------------------------------------------------
 # 🧠 FUNCIÓN PRINCIPAL
@@ -125,59 +141,27 @@ CACHE_TTL = 300
 CACHE_MAX_SIZE = 1000
 
 def get_ai_response(user_message, user_id):
-    """
-    Genera respuesta con IA + cache inteligente
-    """
+    global client
 
-    global client  # 👈 usa el que inicializa el main
+    if client is None:
+        return "Error: el servicio de IA no está disponible."
 
     user_message_str = str(user_message).strip().lower()
 
-    if not user_message_str:
-        return "¿Puedes escribir tu mensaje? 😊"
+    # 👉 aquí tu lógica de crisis si la tienes
 
-    # ❌ si el cliente no está listo
-    if client is None:
-        print("⚠️ Cliente Gemini no inicializado")
-        return "El servicio de IA no está disponible en este momento 🙏"
-
-    cache_key = f"{user_id}:{user_message_str}"
-
-    # 🔥 1. CACHE
-    if cache_key in cache:
-        data = cache[cache_key]
-
-        if time() - data["time"] < CACHE_TTL:
-            print("⚡ Cache HIT")
-            return data["response"]
-        else:
-            del cache[cache_key]
-
-    try:
-        # 🔹 llamada a Gemini
-        response = client.models.generate_content(
-            model=MODELO_GEMINI,
-            contents=[user_message_str]
+    mensajes_chat = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text(text=user_message_str)]
         )
+    ]
 
-        try:
-            answer = response.text
-        except Exception:
-            answer = str(response)
+    config = types.GenerateContentConfig(
+        system_instruction=PROMPT_PSICOLOGIA
+    )
 
-        # 🔥 2. GUARDAR EN CACHE
-        if len(user_message_str) < 100:
-            if len(cache) > CACHE_MAX_SIZE:
-                print("🧹 Limpiando cache...")
-                cache.clear()
+    # 🔥 USAR RETRY
+    answer = generar_respuesta_con_retry(client, mensajes_chat, config)
 
-            cache[cache_key] = {
-                "response": answer,
-                "time": time()
-            }
-
-        return answer
-
-    except Exception as e:
-        print("❌ Error IA:", e)
-        return "Estoy teniendo un problema técnico, intenta nuevamente 🙏"
+    return answer
