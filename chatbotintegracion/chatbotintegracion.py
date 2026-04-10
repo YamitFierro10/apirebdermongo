@@ -47,22 +47,40 @@ app = FastAPI(title="Chatbot Integración", lifespan=lifespan)
 
 def procesar_mensaje(mensaje, numero):
     try:
-        print("🔥 Entró a procesar_mensaje")
+        print("🔥 Procesando mensaje")
 
         if not twilio_client:
-            print("❌ Twilio client es None")
+            print("❌ Twilio no disponible")
             return
 
         if chatbot_module.client is None:
-            print("❌ Gemini no inicializado")
+            print("❌ IA no disponible")
             return
 
-        # 🔹 IA
+        # ✅ 1. Guardar mensaje del usuario
+        if collection:
+            collection.insert_one({
+                "usuario": numero,
+                "mensaje": mensaje,
+                "tipo": "usuario",
+                "timestamp": datetime.utcnow()
+            })
+
+        # ✅ 2. IA responde
         ai_reply = get_ai_response(mensaje, numero)
 
-        print("🤖 Respuesta IA:", ai_reply)
+        print("🤖 IA:", ai_reply)
 
-        # 🔹 enviar mensaje
+        # ✅ 3. Guardar respuesta del bot
+        if collection:
+            collection.insert_one({
+                "usuario": numero,
+                "mensaje": ai_reply,
+                "tipo": "bot",
+                "timestamp": datetime.utcnow()
+            })
+
+        # ✅ 4. Enviar mensaje
         message = twilio_client.messages.create(
             body=ai_reply,
             from_=TWILIO_WHATSAPP_NUMBER,
