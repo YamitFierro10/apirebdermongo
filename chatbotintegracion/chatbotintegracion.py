@@ -11,6 +11,8 @@ from google import genai
 
 from chatbotintegracion.chatbot import get_ai_response
 from chatbotintegracion import chatbot as chatbot_module
+from chatbotintegracion.database import collection
+from datetime import datetime
 
 load_dotenv()
 
@@ -45,17 +47,33 @@ app = FastAPI(title="Chatbot Integración", lifespan=lifespan)
 
 def procesar_mensaje(mensaje, numero):
     try:
-        # ⚠️ validar cliente
-        if chatbot_module.client is None:
-            print("⚠️ IA no disponible")
-            return
+        print("🔥 Procesando mensaje...")
 
+        # ✅ 1. Guardar mensaje del usuario
+        if collection:
+            collection.insert_one({
+                "usuario": numero,
+                "mensaje": mensaje,
+                "tipo": "usuario",
+                "timestamp": datetime.utcnow()
+            })
+
+        # ✅ 2. IA responde
         ai_reply = get_ai_response(mensaje, numero)
+
+        # ✅ 3. Guardar respuesta del bot
+        if collection:
+            collection.insert_one({
+                "usuario": numero,
+                "mensaje": ai_reply,
+                "tipo": "bot",
+                "timestamp": datetime.utcnow()
+            })
 
         print(f"📩 {numero}: {mensaje}")
         print(f"🤖 {ai_reply}")
 
-        # 🔹 enviar respuesta por Twilio
+        # ✅ 4. Enviar por Twilio
         if twilio_client:
             twilio_client.messages.create(
                 body=ai_reply,
@@ -65,15 +83,6 @@ def procesar_mensaje(mensaje, numero):
 
     except Exception as e:
         print("❌ Error procesando mensaje:", e)
-
-        # 🔹 fallback
-        if twilio_client:
-            twilio_client.messages.create(
-                body="Estoy teniendo un problema técnico, intenta nuevamente 🙏",
-                from_=TWILIO_WHATSAPP_NUMBER,
-                to=numero
-            )
-
 
 
 # 🔹 Webhook WhatsApp

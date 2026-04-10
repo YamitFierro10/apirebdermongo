@@ -2,7 +2,6 @@ import os
 import traceback
 from google import genai
 from google.genai import types
-from .database import collection
 from time import time
 
 # 👇 MUY IMPORTANTE
