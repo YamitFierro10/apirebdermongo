@@ -49,49 +49,43 @@ def procesar_mensaje(mensaje, numero):
     try:
         print("🔥 Procesando mensaje")
 
-        if not twilio_client:
-            print("❌ Twilio no disponible")
-            return
+        print("📦 Collection:", collection)
 
-        if chatbot_module.client is None:
-            print("❌ IA no disponible")
-            return
+        # 🔴 PRUEBA DIRECTA A MONGO
+        test = collection.insert_one({
+            "test": "conexion",
+        })
 
-        # ✅ 1. Guardar mensaje del usuario
-        if collection:
-            collection.insert_one({
-                "usuario": numero,
-                "mensaje": mensaje,
-                "tipo": "usuario",
-                "timestamp": datetime.utcnow()
-            })
+        print("✅ Insert test:", test.inserted_id)
 
-        # ✅ 2. IA responde
+        # IA
         ai_reply = get_ai_response(mensaje, numero)
 
-        print("🤖 IA:", ai_reply)
+        # guardar usuario
+        collection.insert_one({
+            "usuario": numero,
+            "mensaje": mensaje,
+            "tipo": "usuario"
+        })
 
-        # ✅ 3. Guardar respuesta del bot
-        if collection:
-            collection.insert_one({
-                "usuario": numero,
-                "mensaje": ai_reply,
-                "tipo": "bot",
-                "timestamp": datetime.utcnow()
-            })
+        # guardar bot
+        collection.insert_one({
+            "usuario": numero,
+            "mensaje": ai_reply,
+            "tipo": "bot"
+        })
 
-        # ✅ 4. Enviar mensaje
-        message = twilio_client.messages.create(
+        # enviar mensaje
+        twilio_client.messages.create(
             body=ai_reply,
             from_=TWILIO_WHATSAPP_NUMBER,
             to=numero
         )
 
-        print("📤 Enviado:", message.sid)
-
     except Exception as e:
-        print("❌ ERROR:", e)
+        print("❌ ERROR MONGO:", e)
 
+        
 # 🔹 Webhook WhatsApp
 @app.post("/whatsapp")
 async def handle_incoming_message(request: Request, background_tasks: BackgroundTasks):
