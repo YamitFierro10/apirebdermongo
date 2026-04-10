@@ -47,8 +47,6 @@ app = FastAPI(title="Chatbot Integración", lifespan=lifespan)
 
 def procesar_mensaje(mensaje, numero):
     try:
-        print("🔥 Procesando mensaje")
-
         col = get_collection()
 
         print("📦 Collection:", col)
