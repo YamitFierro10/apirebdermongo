@@ -45,25 +45,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Chatbot Integración", lifespan=lifespan)
 
-
 def procesar_mensaje(mensaje, numero):
     try:
         print("🔥 Procesando mensaje")
 
-        # 🔌 obtener colección (auto-reconecta)
         col = get_collection()
 
         print("📦 Collection:", col)
 
-        if col is None:
-            print("❌ No hay conexión a MongoDB")
-        
-        else:
+        if col is not None:
             # 🧪 TEST
             test = col.insert_one({"test": "ok"})
             print("✅ TEST:", test.inserted_id)
 
-            # 👤 guardar mensaje usuario
+            # 👤 guardar usuario
             col.insert_one({
                 "usuario": numero,
                 "mensaje": mensaje,
@@ -73,13 +68,13 @@ def procesar_mensaje(mensaje, numero):
 
             print("💾 Usuario guardado")
 
-        # 🧠 IA (esto SIEMPRE debe ejecutarse aunque falle Mongo)
+        # 🧠 IA
         ai_reply = get_ai_response(mensaje, numero)
 
         print("🤖 IA:", ai_reply)
 
-        # 🔌 volver a intentar guardar respuesta
-        if col:
+        if col is not None:
+            # 🤖 guardar bot
             col.insert_one({
                 "usuario": numero,
                 "mensaje": ai_reply,
@@ -89,7 +84,7 @@ def procesar_mensaje(mensaje, numero):
 
             print("💾 Bot guardado")
 
-        # 📤 enviar mensaje
+        # 📤 enviar mensaje (ESTO NO SE ESTABA EJECUTANDO POR EL ERROR)
         twilio_client.messages.create(
             body=ai_reply,
             from_=TWILIO_WHATSAPP_NUMBER,
@@ -100,7 +95,6 @@ def procesar_mensaje(mensaje, numero):
 
     except Exception as e:
         print("❌ ERROR GENERAL:", e)
-
         
 # 🔹 Webhook WhatsApp
 @app.post("/whatsapp")
