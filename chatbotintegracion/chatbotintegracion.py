@@ -111,7 +111,7 @@ async def handle_incoming_message(request: Request, background_tasks: Background
     background_tasks.add_task(procesar_mensaje, incoming_msg, from_number)
 
     # 🔥 respuesta rápida a Twilio
-    resp.message("Estoy procesando tu mensaje... ⏳")
+    #resp.message("Estoy procesando tu mensaje... ⏳")
 
     return Response(content=str(resp), media_type="application/xml")
 
