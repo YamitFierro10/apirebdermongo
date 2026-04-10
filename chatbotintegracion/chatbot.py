@@ -3,6 +3,7 @@ import traceback
 from google import genai
 from google.genai import types
 from .database import collection
+from time import time
 
 # 👇 MUY IMPORTANTE
 client = None
@@ -120,59 +121,64 @@ URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psyc
 # 🧠 FUNCIÓN PRINCIPAL
 # -----------------------------------------------------------------
 
+cache = {}
+CACHE_TTL = 300
+CACHE_MAX_SIZE = 1000
+
 def get_ai_response(user_message, user_id):
+    """
+    Genera respuesta con IA + cache inteligente
+    """
 
-    global client
-
-    if not client:
-        return "Error: el servicio de IA no está disponible en este momento."
+    global client  # 👈 usa el que inicializa el main
 
     user_message_str = str(user_message).strip().lower()
 
-    if any(p in user_message_str for p in CRISIS_KEYWORDS):
-        return (
-            "Siento que estás pasando por algo muy duro. No tienes por qué llevarlo solo. "
-            f"Aquí puedes buscar apoyo:\n{URL_APOYO}"
-        )
+    if not user_message_str:
+        return "¿Puedes escribir tu mensaje? 😊"
 
-    mensajes_chat = []
+    # ❌ si el cliente no está listo
+    if client is None:
+        print("⚠️ Cliente Gemini no inicializado")
+        return "El servicio de IA no está disponible en este momento 🙏"
 
-    try:
-        historial = list(
-            collection.find({"user_id": user_id}, {"role": 1, "content": 1})
-            .sort("_id", -1)
-            .limit(MAX_MENSAJES_HISTORIAL)
-        )
+    cache_key = f"{user_id}:{user_message_str}"
 
-        for msg in historial[::-1]:
-            part = types.Part.from_text(text=msg.get("content", ""))
-            role = "user" if msg["role"] == "user" else "model"
-            mensajes_chat.append(types.Content(role=role, parts=[part]))
+    # 🔥 1. CACHE
+    if cache_key in cache:
+        data = cache[cache_key]
 
-    except Exception:
-        traceback.print_exc()
-
-    mensajes_chat.append(
-        types.Content(
-            role="user",
-            parts=[types.Part.from_text(text=user_message_str)]
-        )
-    )
+        if time() - data["time"] < CACHE_TTL:
+            print("⚡ Cache HIT")
+            return data["response"]
+        else:
+            del cache[cache_key]
 
     try:
+        # 🔹 llamada a Gemini
         response = client.models.generate_content(
             model=MODELO_GEMINI,
-            contents=mensajes_chat,
-            config=types.GenerateContentConfig(system_instruction=PROMPT_PSICOLOGIA)
+            contents=[user_message_str]
         )
 
         try:
             answer = response.text
-        except:
+        except Exception:
             answer = str(response)
 
-    except Exception:
-        traceback.print_exc()
-        answer = "Tu mensaje es importante, pero hubo un error procesándolo."
+        # 🔥 2. GUARDAR EN CACHE
+        if len(user_message_str) < 100:
+            if len(cache) > CACHE_MAX_SIZE:
+                print("🧹 Limpiando cache...")
+                cache.clear()
 
-    return answer
+            cache[cache_key] = {
+                "response": answer,
+                "time": time()
+            }
+
+        return answer
+
+    except Exception as e:
+        print("❌ Error IA:", e)
+        return "Estoy teniendo un problema técnico, intenta nuevamente 🙏"

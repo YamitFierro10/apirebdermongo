@@ -3,7 +3,7 @@ import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import Response
 from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
@@ -11,7 +11,6 @@ from google import genai
 
 from chatbotintegracion.chatbot import get_ai_response
 from chatbotintegracion import chatbot as chatbot_module
-from chatbotintegracion.api import handle
 
 load_dotenv()
 
@@ -44,9 +43,42 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Chatbot Integración", lifespan=lifespan)
 
+def procesar_mensaje(mensaje, numero):
+    try:
+        # ⚠️ validar cliente
+        if chatbot_module.client is None:
+            print("⚠️ IA no disponible")
+            return
+
+        ai_reply = get_ai_response(mensaje, numero)
+
+        print(f"📩 {numero}: {mensaje}")
+        print(f"🤖 {ai_reply}")
+
+        # 🔹 enviar respuesta por Twilio
+        if twilio_client:
+            twilio_client.messages.create(
+                body=ai_reply,
+                from_=TWILIO_WHATSAPP_NUMBER,
+                to=numero
+            )
+
+    except Exception as e:
+        print("❌ Error procesando mensaje:", e)
+
+        # 🔹 fallback
+        if twilio_client:
+            twilio_client.messages.create(
+                body="Estoy teniendo un problema técnico, intenta nuevamente 🙏",
+                from_=TWILIO_WHATSAPP_NUMBER,
+                to=numero
+            )
+
+
+
 # 🔹 Webhook WhatsApp
 @app.post("/whatsapp")
-async def handle_incoming_message(request: Request):
+async def handle_incoming_message(request: Request, background_tasks: BackgroundTasks):
     form = await request.form()
     incoming_msg = form.get("Body")
     from_number = form.get("From")
@@ -57,19 +89,13 @@ async def handle_incoming_message(request: Request):
         resp.message("No recibí mensaje 🤔")
         return Response(content=str(resp), media_type="application/xml")
 
-    # IA
-    ai_reply = get_ai_response(incoming_msg, from_number)
+    # 🔥 enviar a procesamiento en segundo plano
+    background_tasks.add_task(procesar_mensaje, incoming_msg, from_number)
 
-    print(f"📩 {from_number}: {incoming_msg}")
-    print(f"🤖 {ai_reply}")
-
-    # 👉 SOLO UNA forma de responder (RECOMENDADO)
-    resp.message(ai_reply)
+    # 🔥 respuesta rápida a Twilio
+    resp.message("Estoy procesando tu mensaje... ⏳")
 
     return Response(content=str(resp), media_type="application/xml")
-
-# 🔹 Rutas adicionales
-app.add_api_route("/handle", handle, methods=["GET", "POST"])
 
 @app.get("/")
 def root():
