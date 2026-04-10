@@ -47,43 +47,32 @@ app = FastAPI(title="Chatbot Integración", lifespan=lifespan)
 
 def procesar_mensaje(mensaje, numero):
     try:
-        print("🔥 Procesando mensaje...")
+        print("🔥 Entró a procesar_mensaje")
 
-        # ✅ 1. Guardar mensaje del usuario
-        if collection:
-            collection.insert_one({
-                "usuario": numero,
-                "mensaje": mensaje,
-                "tipo": "usuario",
-                "timestamp": datetime.utcnow()
-            })
+        if not twilio_client:
+            print("❌ Twilio client es None")
+            return
 
-        # ✅ 2. IA responde
+        if chatbot_module.client is None:
+            print("❌ Gemini no inicializado")
+            return
+
+        # 🔹 IA
         ai_reply = get_ai_response(mensaje, numero)
 
-        # ✅ 3. Guardar respuesta del bot
-        if collection:
-            collection.insert_one({
-                "usuario": numero,
-                "mensaje": ai_reply,
-                "tipo": "bot",
-                "timestamp": datetime.utcnow()
-            })
+        print("🤖 Respuesta IA:", ai_reply)
 
-        print(f"📩 {numero}: {mensaje}")
-        print(f"🤖 {ai_reply}")
+        # 🔹 enviar mensaje
+        message = twilio_client.messages.create(
+            body=ai_reply,
+            from_=TWILIO_WHATSAPP_NUMBER,
+            to=numero
+        )
 
-        # ✅ 4. Enviar por Twilio
-        if twilio_client:
-            twilio_client.messages.create(
-                body=ai_reply,
-                from_=TWILIO_WHATSAPP_NUMBER,
-                to=numero
-            )
+        print("📤 Enviado:", message.sid)
 
     except Exception as e:
-        print("❌ Error procesando mensaje:", e)
-
+        print("❌ ERROR:", e)
 
 # 🔹 Webhook WhatsApp
 @app.post("/whatsapp")
