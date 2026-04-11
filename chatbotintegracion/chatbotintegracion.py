@@ -64,8 +64,6 @@ async def handle_incoming_message(request: Request, background_tasks: Background
     # 🔥 SOLO delega al servicio
     background_tasks.add_task(procesar_mensaje_pro, incoming_msg, from_number)
 
-    # 🔥 respuesta rápida (NO más “procesando...”)
-    resp.message("👍 Recibido")
 
     return Response(content=str(resp), media_type="application/xml")
 
