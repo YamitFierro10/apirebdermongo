@@ -139,28 +139,6 @@ def is_rate_limited(user_id):
 
 
 # =========================
-# ⚙️ CONFIG
-# =========================
-MODELO_GROQ = "llama-3.1-8b-instant"
-MODELO_GEMINI = "gemini-2.5-flash"
-
-# =========================
-# 🧠 PROMPT
-# =========================
-PROMPT_PSICOLOGIA = """Eres un asistente cercano que responde de forma breve, cálida y humana. Responde en 1 o 2 frases máximo."""
-
-# =========================
-# 🚨 CRISIS
-# =========================
-CRISIS_KEYWORDS = [
-    "no puedo más", "ya no puedo", "me siento muy mal",
-    "no tengo fuerzas", "quiero rendirme", "no veo salida"
-]
-
-URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psychology&city_name=bogota"
-
-
-# =========================
 # 🤖 GEMINI
 # =========================
 def responder_con_gemini(mensaje):
