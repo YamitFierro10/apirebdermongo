@@ -1,11 +1,26 @@
 import os
 import time
-from google.genai import types
+from time import time as now
 
-# 👇 MUY IMPORTANTE
+from google.genai import types
+from groq import Groq
+
+# 🔥 cliente Gemini (inyectado desde main)
 client = None
 
+# 🔥 cliente Groq
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+
+# =========================
+# ⚡ CACHE
+# =========================
+cache = {}
+CACHE_TTL = 300
+
+
 # --- CONFIG ---
+MODELO_GROQ = "llama3-70b-8192"
 MODELO_GEMINI = "gemini-2.5-flash"
 MAX_RESPUESTA = 1500
 MAX_MENSAJES_HISTORIAL = 10
@@ -114,61 +129,117 @@ CRISIS_KEYWORDS = [
 URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psychology&city_name=bogota"
 
 # =========================
-# 🧠 FUNCIÓN PRINCIPAL
+# 🚦 RATE LIMIT
 # =========================
+user_last_request = {}
 
-def get_ai_response(user_message, user_id):
+def is_rate_limited(user_id):
+    t = now()
+    if user_id in user_last_request:
+        if t - user_last_request[user_id] < 2:
+            return True
+    user_last_request[user_id] = t
+    return False
+
+
+# =========================
+# 🤖 GEMINI
+# =========================
+def responder_con_gemini(mensaje):
     global client
 
     if client is None:
-        return "El servicio de IA no está disponible en este momento."
+        raise Exception("Gemini no disponible")
 
-    user_message_str = str(user_message).strip().lower()
-
-    if not user_message_str:
-        return "¿Puedes escribir tu mensaje? 😊"
-
-    # =========================
-    # 🚨 DETECCIÓN CRISIS
-    # =========================
-    if any(p in user_message_str for p in CRISIS_KEYWORDS):
-        return (
-            "Siento que estás pasando por algo muy difícil. "
-            f"Puedes buscar apoyo aquí: {URL_APOYO}"
-        )
-
-    # =========================
-    # 🧠 MENSAJE PARA GEMINI
-    # =========================
     mensajes = [
         types.Content(
             role="user",
-            parts=[types.Part.from_text(text=user_message_str)]
+            parts=[types.Part.from_text(text=mensaje)]
         )
     ]
 
-    config = types.GenerateContentConfig(
-        system_instruction=PROMPT_PSICOLOGIA
+    config = types.GenerateContentConfig(system_instruction=PROMPT)
+
+    response = client.models.generate_content(
+        model=MODELO_GEMINI,
+        contents=mensajes,
+        config=config
     )
 
-    # =========================
-    # 🔥 RETRY IA
-    # =========================
-    for intento in range(3):
-        try:
-            response = client.models.generate_content(
-                model=MODELO_GEMINI,
-                contents=mensajes,
-                config=config
-            )
+    return response.text
 
-            try:
-                return response.text
-            except Exception:
-                return str(response)
+
+# =========================
+# ⚡ GROQ (FALLBACK)
+# =========================
+def responder_con_groq(mensaje):
+    chat = groq_client.chat.completions.create(
+        messages=[
+            {"role": "system", "content": PROMPT},
+            {"role": "user", "content": mensaje}
+        ],
+        model=MODELO_GROQ
+    )
+
+    return chat.choices[0].message.content
+
+
+# =========================
+# 🧠 FUNCIÓN PRINCIPAL
+# =========================
+def get_ai_response(user_message, user_id):
+    user_message_str = str(user_message).strip().lower()
+
+    if not user_message_str:
+        return "¿Puedes escribirme un poco más? 😊"
+
+    # 🚦 rate limit
+    if is_rate_limited(user_id):
+        return "Dame un momento, ya te respondo 💬"
+
+    # 🚨 crisis
+    if any(p in user_message_str for p in CRISIS_KEYWORDS):
+        return f"No tienes que pasar por esto solo. Aquí puedes buscar apoyo: {URL_APOYO}"
+
+    # ⚡ cache
+    if user_message_str in cache:
+        data = cache[user_message_str]
+        if now() - data["time"] < CACHE_TTL:
+            print("⚡ Cache HIT")
+            return data["response"]
+
+    # =========================
+    # 🔥 1. GEMINI (RETRY)
+    # =========================
+    for intento in range(2):
+        try:
+            print(f"🧠 Gemini intento {intento+1}")
+            respuesta = responder_con_gemini(user_message_str)
+
+            if respuesta:
+                cache[user_message_str] = {
+                    "response": respuesta,
+                    "time": now()
+                }
+                return respuesta
 
         except Exception as e:
-            print(f"❌ IA intento {intento+1}:", e)
-            time.sleep(2)
+            print("❌ Gemini falló:", e)
+            time.sleep(1)
 
-    return "Tu mensaje es importante, pero estoy teniendo problemas técnicos 🙏"
+    # =========================
+    # 🚀 2. GROQ (FALLBACK)
+    # =========================
+    try:
+        print("🚀 Usando Groq fallback")
+        respuesta = responder_con_groq(user_message_str)
+
+        return respuesta
+
+    except Exception as e:
+        print("❌ Groq también falló:", e)
+
+    # =========================
+    # 🧡 ÚLTIMO RESPALDO
+    # =========================
+    return "Estoy aquí contigo. Cuéntame un poco más 💬"
