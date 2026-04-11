@@ -1,30 +1,24 @@
-# chatbotintegracion/chatbotintegracion.py
 import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import Response
-from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
 from google import genai
 
-from chatbotintegracion.chatbot import get_ai_response
-from chatbotintegracion import chatbot as chatbot_module
-from chatbotintegracion.database import get_collection
-from datetime import datetime
+# 🔥 importar chatbot (para inyectar cliente)
+import chatbotintegracion.chatbot as chatbot_module
 
+# 🔥 importar servicio (AQUÍ está la lógica)
+from chatbotintegracion.services import procesar_mensaje_pro
 
 load_dotenv()
 
-# 🔹 Twilio config
-twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
-twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
 
-twilio_client = Client(twilio_sid, twilio_token) if twilio_sid and twilio_token else None
-
-# 🔹 Lifespan (reemplaza on_event)
+# =========================
+# 🔹 LIFESPAN (INICIALIZAR GEMINI)
+# =========================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -44,47 +38,16 @@ async def lifespan(app: FastAPI):
 
     print("🔒 Cerrando aplicación...")
 
+
+# =========================
+# 🚀 APP
+# =========================
 app = FastAPI(title="Chatbot Integración", lifespan=lifespan)
 
 
-def procesar_mensaje(mensaje, numero):
-    try:
-        print("🔥 Procesando mensaje")
-
-        col = get_collection()
-
-        if col is not None:
-            col.insert_one({
-                "usuario": numero,
-                "mensaje": mensaje,
-                "tipo": "usuario",
-                "timestamp": datetime.utcnow()
-            })
-
-        # IA
-        ai_reply = get_ai_response(mensaje, numero)
-
-        print("🤖 IA:", ai_reply)
-
-        if col is not None:
-            col.insert_one({
-                "usuario": numero,
-                "mensaje": ai_reply,
-                "tipo": "bot",
-                "timestamp": datetime.utcnow()
-            })
-
-        # Twilio
-        twilio_client.messages.create(
-            body=ai_reply,
-            from_=TWILIO_WHATSAPP_NUMBER,
-            to=numero
-        )
-
-    except Exception as e:
-        print("❌ ERROR GENERAL:", e)
-
-
+# =========================
+# 📩 WEBHOOK WHATSAPP
+# =========================
 @app.post("/whatsapp")
 async def handle_incoming_message(request: Request, background_tasks: BackgroundTasks):
 
@@ -98,12 +61,18 @@ async def handle_incoming_message(request: Request, background_tasks: Background
         resp.message("No recibí mensaje 🤔")
         return Response(content=str(resp), media_type="application/xml")
 
-    background_tasks.add_task(procesar_mensaje, incoming_msg, from_number)
+    # 🔥 SOLO delega al servicio
+    background_tasks.add_task(procesar_mensaje_pro, incoming_msg, from_number)
 
-    resp.message("Estoy procesando tu mensaje... ⏳")
+    # 🔥 respuesta rápida (NO más “procesando...”)
+    resp.message("👍 Recibido")
 
     return Response(content=str(resp), media_type="application/xml")
 
+
+# =========================
+# 🩺 HEALTH CHECK
+# =========================
 @app.get("/")
 def root():
     return {"status": "ok"}

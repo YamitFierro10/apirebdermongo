@@ -1,9 +1,6 @@
 import os
 import time
-import traceback
-from google import genai
 from google.genai import types
-from time import time
 
 # 👇 MUY IMPORTANTE
 client = None
@@ -116,41 +113,34 @@ CRISIS_KEYWORDS = [
 # URL para redirigir casos críticos
 URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psychology&city_name=bogota"
 
-def generar_respuesta_con_retry(client, mensajes_chat, config):
-    for intento in range(3):
-        try:
-            response = client.models.generate_content(
-                model=MODELO_GEMINI,
-                contents=mensajes_chat,
-                config=config
-            )
-            return response.text
-
-        except Exception as e:
-            print(f"❌ Intento {intento+1} falló:", e)
-            time.sleep(2)
-
-    return "Tu mensaje es importante, pero hubo un error procesándolo."
-
-# -----------------------------------------------------------------
+# =========================
 # 🧠 FUNCIÓN PRINCIPAL
-# -----------------------------------------------------------------
-
-cache = {}
-CACHE_TTL = 300
-CACHE_MAX_SIZE = 1000
+# =========================
 
 def get_ai_response(user_message, user_id):
     global client
 
     if client is None:
-        return "Error: el servicio de IA no está disponible."
+        return "El servicio de IA no está disponible en este momento."
 
     user_message_str = str(user_message).strip().lower()
 
-    # 👉 aquí tu lógica de crisis si la tienes
+    if not user_message_str:
+        return "¿Puedes escribir tu mensaje? 😊"
 
-    mensajes_chat = [
+    # =========================
+    # 🚨 DETECCIÓN CRISIS
+    # =========================
+    if any(p in user_message_str for p in CRISIS_KEYWORDS):
+        return (
+            "Siento que estás pasando por algo muy difícil. "
+            f"Puedes buscar apoyo aquí: {URL_APOYO}"
+        )
+
+    # =========================
+    # 🧠 MENSAJE PARA GEMINI
+    # =========================
+    mensajes = [
         types.Content(
             role="user",
             parts=[types.Part.from_text(text=user_message_str)]
@@ -161,7 +151,24 @@ def get_ai_response(user_message, user_id):
         system_instruction=PROMPT_PSICOLOGIA
     )
 
-    # 🔥 USAR RETRY
-    answer = generar_respuesta_con_retry(client, mensajes_chat, config)
+    # =========================
+    # 🔥 RETRY IA
+    # =========================
+    for intento in range(3):
+        try:
+            response = client.models.generate_content(
+                model=MODELO_GEMINI,
+                contents=mensajes,
+                config=config
+            )
 
-    return answer
+            try:
+                return response.text
+            except Exception:
+                return str(response)
+
+        except Exception as e:
+            print(f"❌ IA intento {intento+1}:", e)
+            time.sleep(2)
+
+    return "Tu mensaje es importante, pero estoy teniendo problemas técnicos 🙏"
