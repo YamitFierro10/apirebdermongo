@@ -124,10 +124,6 @@ CRISIS_KEYWORDS = [
 # URL para redirigir casos críticos
 URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psychology&city_name=bogota"
 
-from time import time as now
-import time
-import os
-
 # =========================
 # 🚦 RATE LIMIT
 # =========================
@@ -158,7 +154,7 @@ def responder_con_gemini(mensaje):
         )
     ]
 
-    config = types.GenerateContentConfig(system_instruction=PROMPT)
+    config = types.GenerateContentConfig(system_instruction=PROMPT_PSICOLOGIA)
 
     response = client.models.generate_content(
         model=MODELO_GEMINI,
@@ -183,7 +179,7 @@ def responder_con_groq(mensaje):
 
         chat = groq_client.chat.completions.create(
             messages=[
-                {"role": "system", "content": PROMPT},
+                {"role": "system", "content": PROMPT_PSICOLOGIA},
                 {"role": "user", "content": mensaje}
             ],
             model=MODELO_GROQ
