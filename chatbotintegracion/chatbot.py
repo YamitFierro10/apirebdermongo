@@ -8,10 +8,6 @@ from groq import Groq
 # 🔥 cliente Gemini (inyectado desde main)
 client = None
 
-# 🔥 cliente Groq
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
-
 # =========================
 # ⚡ CACHE
 # =========================
@@ -128,6 +124,10 @@ CRISIS_KEYWORDS = [
 # URL para redirigir casos críticos
 URL_APOYO = "https://www.doctoralia.co/search-assistant?specialization_name=psychology&city_name=bogota"
 
+from time import time as now
+import time
+import os
+
 # =========================
 # 🚦 RATE LIMIT
 # =========================
@@ -166,22 +166,34 @@ def responder_con_gemini(mensaje):
         config=config
     )
 
-    return response.text
+    try:
+        return response.text
+    except Exception:
+        return str(response)
 
 
 # =========================
-# ⚡ GROQ (FALLBACK)
+# ⚡ GROQ (FALLBACK SEGURO)
 # =========================
 def responder_con_groq(mensaje):
-    chat = groq_client.chat.completions.create(
-        messages=[
-            {"role": "system", "content": PROMPT},
-            {"role": "user", "content": mensaje}
-        ],
-        model=MODELO_GROQ
-    )
+    try:
+        from groq import Groq
 
-    return chat.choices[0].message.content
+        groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+        chat = groq_client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": PROMPT},
+                {"role": "user", "content": mensaje}
+            ],
+            model=MODELO_GROQ
+        )
+
+        return chat.choices[0].message.content
+
+    except Exception as e:
+        print("❌ Error Groq:", e)
+        return None
 
 
 # =========================
@@ -230,14 +242,11 @@ def get_ai_response(user_message, user_id):
     # =========================
     # 🚀 2. GROQ (FALLBACK)
     # =========================
-    try:
-        print("🚀 Usando Groq fallback")
-        respuesta = responder_con_groq(user_message_str)
+    print("🚀 Usando Groq fallback")
+    respuesta = responder_con_groq(user_message_str)
 
+    if respuesta:
         return respuesta
-
-    except Exception as e:
-        print("❌ Groq también falló:", e)
 
     # =========================
     # 🧡 ÚLTIMO RESPALDO
