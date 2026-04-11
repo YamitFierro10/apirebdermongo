@@ -3,10 +3,10 @@ import time
 from time import time as now
 
 from google.genai import types
-from groq import Groq
 
 # 🔥 cliente Gemini (inyectado desde main)
 client = None
+groq_disabled = False
 
 # =========================
 # ⚡ CACHE
@@ -172,9 +172,22 @@ def responder_con_gemini(mensaje):
 # ⚡ GROQ (FALLBACK SEGURO)
 # =========================
 def responder_con_groq(mensaje):
-    try:
+    global groq_disabled
 
-        groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    if groq_disabled:
+        return None
+
+    try:
+        from groq import Groq
+
+        api_key = os.getenv("GROQ_API_KEY")
+
+        if not api_key:
+            print("⚠️ GROQ_API_KEY no configurada")
+            groq_disabled = True
+            return None
+
+        groq_client = Groq(api_key=api_key)
 
         chat = groq_client.chat.completions.create(
             messages=[
@@ -188,6 +201,7 @@ def responder_con_groq(mensaje):
 
     except Exception as e:
         print("❌ Error Groq:", e)
+        groq_disabled = True  # 🔥 lo desactiva después del primer fallo
         return None
 
 
@@ -232,6 +246,10 @@ def get_ai_response(user_message, user_id):
 
         except Exception as e:
             print("❌ Gemini falló:", e)
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                print("🚫 Sin cuota Gemini")
+                break  # no seguir intentando
+
             time.sleep(1)
 
     # =========================
