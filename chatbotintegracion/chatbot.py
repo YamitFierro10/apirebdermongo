@@ -141,7 +141,7 @@ def is_rate_limited(user_id):
 # =========================
 # ⚙️ CONFIG
 # =========================
-MODELO_GROQ = "llama3-70b-8192"
+MODELO_GROQ = "llama3-8b-8192"
 MODELO_GEMINI = "gemini-2.5-flash"
 
 # =========================
