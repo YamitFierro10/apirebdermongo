@@ -173,7 +173,6 @@ def responder_con_gemini(mensaje):
 # =========================
 def responder_con_groq(mensaje):
     try:
-        from groq import Groq
 
         groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
