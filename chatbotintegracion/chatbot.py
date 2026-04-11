@@ -137,7 +137,6 @@ def is_rate_limited(user_id):
     user_last_request[user_id] = t
     return False
 
-
 # =========================
 # 🤖 GEMINI
 # =========================
@@ -169,7 +168,7 @@ def responder_con_gemini(mensaje):
 
 
 # =========================
-# 🚀 GROQ (SIN LIBRERÍA)
+# 🚀 GROQ (PRINCIPAL)
 # =========================
 def responder_con_groq(mensaje):
     try:
@@ -196,7 +195,7 @@ def responder_con_groq(mensaje):
             "https://api.groq.com/openai/v1/chat/completions",
             headers=headers,
             json=data,
-            timeout=10
+            timeout=8
         )
 
         if response.status_code == 200:
@@ -206,7 +205,7 @@ def responder_con_groq(mensaje):
         return None
 
     except Exception as e:
-        print("❌ Error Groq HTTP:", e)
+        print("❌ Error Groq:", e)
         return None
 
 
@@ -227,15 +226,30 @@ def get_ai_response(user_message, user_id):
     if any(p in user_message_str for p in CRISIS_KEYWORDS):
         return f"No tienes que pasar por esto solo. Aquí puedes buscar apoyo: {URL_APOYO}"
 
-    # ⚡ cache
-    if user_message_str in cache:
-        data = cache[user_message_str]
+    # ⚡ cache por usuario (MEJORADO)
+    cache_key = f"{user_id}:{user_message_str}"
+
+    if cache_key in cache:
+        data = cache[cache_key]
         if now() - data["time"] < CACHE_TTL:
             print("⚡ Cache HIT")
             return data["response"]
 
     # =========================
-    # 🔥 1. GEMINI (RETRY)
+    # 🚀 1. GROQ (PRINCIPAL)
+    # =========================
+    print("🚀 Groq principal")
+    respuesta = responder_con_groq(user_message_str)
+
+    if respuesta:
+        cache[cache_key] = {
+            "response": respuesta,
+            "time": now()
+        }
+        return respuesta
+
+    # =========================
+    # 🧠 2. GEMINI (BACKUP)
     # =========================
     for intento in range(2):
         try:
@@ -243,7 +257,7 @@ def get_ai_response(user_message, user_id):
             respuesta = responder_con_gemini(user_message_str)
 
             if respuesta:
-                cache[user_message_str] = {
+                cache[cache_key] = {
                     "response": respuesta,
                     "time": now()
                 }
@@ -257,15 +271,6 @@ def get_ai_response(user_message, user_id):
                 break
 
             time.sleep(1)
-
-    # =========================
-    # 🚀 2. GROQ (FALLBACK)
-    # =========================
-    print("🚀 Usando Groq fallback")
-    respuesta = responder_con_groq(user_message_str)
-
-    if respuesta:
-        return respuesta
 
     # =========================
     # 🧡 ÚLTIMO RESPALDO
