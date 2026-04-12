@@ -11,7 +11,7 @@ from google import genai
 import chatbotintegracion.chatbot as chatbot_module
 
 # 🔥 importar servicios
-from chatbotintegracion.services.whatsapp import (
+from chatbotintegracion.services import (
     procesar_mensaje_pro,
     mensaje_seguimiento
 )
