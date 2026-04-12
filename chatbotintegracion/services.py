@@ -1,5 +1,6 @@
 import os
 import time
+from time import time as now
 from datetime import datetime
 
 from twilio.rest import Client
@@ -16,6 +17,43 @@ twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
 
 twilio_client = Client(twilio_sid, twilio_token) if twilio_sid and twilio_token else None
+
+
+# =========================
+# 🧠 TRACKING USUARIO
+# =========================
+user_last_seen = {}
+
+
+def actualizar_actividad(numero):
+    user_last_seen[numero] = now()
+
+
+# =========================
+# ⏱️ MENSAJE SEGUIMIENTO
+# =========================
+def mensaje_seguimiento(numero, delay=300):
+    time.sleep(delay)
+
+    last = user_last_seen.get(numero)
+
+    if not last:
+        return
+
+    # si el usuario volvió a escribir → cancelar
+    if now() - last < delay:
+        print("⏳ Usuario activo, no enviar seguimiento")
+        return
+
+    try:
+        enviar_whatsapp_con_retry(
+            numero,
+            "¿Sigues ahí? 😊 ¿Te puedo ayudar en algo?"
+        )
+        print("📩 Seguimiento enviado")
+
+    except Exception as e:
+        print("❌ Error seguimiento:", e)
 
 
 # =========================
@@ -66,6 +104,9 @@ def generar_respuesta_segura(mensaje, numero):
 # =========================
 def procesar_mensaje_pro(mensaje, numero):
     print("🔥 Iniciando procesamiento PRO")
+
+    # 🧠 actualizar actividad
+    actualizar_actividad(numero)
 
     col = get_collection()
 
