@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 from time import time as now
 from datetime import datetime
 
@@ -30,30 +31,34 @@ def actualizar_actividad(numero):
 
 
 # =========================
-# ⏱️ MENSAJE SEGUIMIENTO
+# ⏱️ MENSAJE SEGUIMIENTO (NO BLOQUEANTE)
 # =========================
 def mensaje_seguimiento(numero, delay=300):
-    time.sleep(delay)
+    def tarea():
+        time.sleep(delay)
 
-    last = user_last_seen.get(numero)
+        last = user_last_seen.get(numero)
 
-    if not last:
-        return
+        if not last:
+            return
 
-    # si el usuario volvió a escribir → cancelar
-    if now() - last < delay:
-        print("⏳ Usuario activo, no enviar seguimiento")
-        return
+        # 🚫 Si el usuario volvió → cancelar
+        if now() - last < delay:
+            print("⏳ Usuario activo, no enviar seguimiento")
+            return
 
-    try:
-        enviar_whatsapp_con_retry(
-            numero,
-            "¿Sigues ahí? 😊 ¿Te puedo ayudar en algo?"
-        )
-        print("📩 Seguimiento enviado")
+        try:
+            enviar_whatsapp_con_retry(
+                numero,
+                "¿Sigues ahí? 😊 ¿Te puedo ayudar en algo?"
+            )
+            print("📩 Seguimiento enviado")
 
-    except Exception as e:
-        print("❌ Error seguimiento:", e)
+        except Exception as e:
+            print("❌ Error seguimiento:", e)
+
+    # 🚀 Ejecutar en segundo plano
+    threading.Thread(target=tarea, daemon=True).start()
 
 
 # =========================
@@ -105,7 +110,7 @@ def generar_respuesta_segura(mensaje, numero):
 def procesar_mensaje_pro(mensaje, numero):
     print("🔥 Iniciando procesamiento PRO")
 
-    # 🧠 actualizar actividad
+    # 🧠 actualizar actividad del usuario
     actualizar_actividad(numero)
 
     col = get_collection()
@@ -151,3 +156,8 @@ def procesar_mensaje_pro(mensaje, numero):
     # 📤 ENVIAR RESPUESTA WHATSAPP
     # =========================
     enviar_whatsapp_con_retry(numero, respuesta)
+
+    # =========================
+    # ⏱️ SEGUIMIENTO AUTOMÁTICO
+    # =========================
+    mensaje_seguimiento(numero)

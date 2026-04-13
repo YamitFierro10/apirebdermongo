@@ -10,11 +10,8 @@ from google import genai
 # 🔥 importar chatbot (para inyectar cliente)
 import chatbotintegracion.chatbot as chatbot_module
 
-# 🔥 importar servicios
-from chatbotintegracion.services import (
-    procesar_mensaje_pro,
-    mensaje_seguimiento
-)
+# 🔥 importar servicio (SOLO UNO)
+from chatbotintegracion.services import procesar_mensaje_pro
 
 load_dotenv()
 
@@ -64,11 +61,8 @@ async def handle_incoming_message(request: Request, background_tasks: Background
         resp.message("No recibí mensaje 🤔")
         return Response(content=str(resp), media_type="application/xml")
 
-    # 🔥 Procesamiento principal (IA + Mongo + envío)
+    # 🔥 SOLO delega al servicio PRO
     background_tasks.add_task(procesar_mensaje_pro, incoming_msg, from_number)
-
-    # ⏱️ Seguimiento automático (5 minutos)
-    background_tasks.add_task(mensaje_seguimiento, from_number, 300)
 
     return Response(content=str(resp), media_type="application/xml")
 

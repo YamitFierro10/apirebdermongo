@@ -6,82 +6,91 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# 🔹 variable de entorno
-MONGO_URI = os.getenv("MONGO_URI")
-
-# 🔹 cliente global
 client = None
+client_db = None
+collection = None
+fs = None
 
 
 # =========================
-# 🔌 CONEXIÓN AUTO-RECONNECT
+# 🔥 CONEXIÓN
 # =========================
-def get_client():
-    global client
+def conectar_db():
+    global client, client_db, collection, fs
+
+    if client is not None:
+        return
+
+    MONGO_URI = os.getenv("MONGO_URI")
 
     try:
-        if client is None:
-            print("🔌 Conectando a MongoDB...")
-            client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
-            client.admin.command("ping")
-            print("✅ MongoDB conectado")
+        print("🔌 Conectando a MongoDB...")
+        client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+        client.admin.command("ping")
 
-        return client
+        client_db = client["chatbot_db"]
+        collection = client_db["conversaciones"]
+        fs = gridfs.GridFS(client_db)
+
+        print("✅ MongoDB conectado correctamente")
 
     except Exception as e:
         print("❌ Error conectando MongoDB:", e)
         client = None
-        return None
 
 
 # =========================
-# 📦 COLECCIÓN
+# 📦 GET COLLECTION
 # =========================
 def get_collection():
+    global collection
+
+    if collection is None:
+        conectar_db()
+
+    return collection
+
+
+# =========================
+# 🧠 HISTORIAL
+# =========================
+def obtener_historial(usuario, limite=10):
+    col = get_collection()
+
+    if col is None:
+        return []
+
     try:
-        client = get_client()
+        mensajes = list(
+            col.find({"usuario": usuario})
+            .sort("timestamp", -1)
+            .limit(limite)
+        )
 
-        if client is None:
-            return None
-
-        db = client["chatbot_db"]
-        return db["conversaciones"]
+        mensajes.reverse()
+        return mensajes
 
     except Exception as e:
-        print("❌ Error obteniendo colección:", e)
-        return None
+        print("❌ Error obteniendo historial:", e)
+        return []
 
 
 # =========================
 # 📁 GRIDFS
 # =========================
-def get_fs():
-    try:
-        client = get_client()
-
-        if client is None:
-            return None
-
-        db = client["chatbot_db"]
-        return gridfs.GridFS(db)
-
-    except Exception as e:
-        print("❌ Error GridFS:", e)
-        return None
-
-
 def guardar_archivo(ruta_archivo, nombre_archivo):
-    fs = get_fs()
+    if fs is None:
+        conectar_db()
 
     if fs is None:
         return None
 
     try:
         with open(ruta_archivo, "rb") as archivo:
-            file_id = fs.put(archivo, filename=nombre_archivo)
+            archivo_id = fs.put(archivo, filename=nombre_archivo)
 
         print(f"📁 Archivo guardado: {nombre_archivo}")
-        return file_id
+        return archivo_id
 
     except Exception as e:
         print("❌ Error guardando archivo:", e)
@@ -89,7 +98,8 @@ def guardar_archivo(ruta_archivo, nombre_archivo):
 
 
 def obtener_archivo(nombre_archivo):
-    fs = get_fs()
+    if fs is None:
+        conectar_db()
 
     if fs is None:
         return None

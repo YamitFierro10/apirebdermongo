@@ -137,6 +137,7 @@ def is_rate_limited(user_id):
     user_last_request[user_id] = t
     return False
 
+
 # =========================
 # 🤖 GEMINI
 # =========================
@@ -170,7 +171,7 @@ def responder_con_gemini(mensaje):
 # =========================
 # 🚀 GROQ (PRINCIPAL)
 # =========================
-def responder_con_groq(mensaje):
+def responder_con_groq(mensaje, usuario):
     try:
         api_key = os.getenv("GROQ_API_KEY")
 
@@ -183,10 +184,14 @@ def responder_con_groq(mensaje):
             "Content-Type": "application/json"
         }
 
+        # 🧠 contexto
+        contexto = construir_contexto(usuario)
+
         data = {
             "model": MODELO_GROQ,
             "messages": [
                 {"role": "system", "content": PROMPT_PSICOLOGIA},
+                *contexto,
                 {"role": "user", "content": mensaje}
             ]
         }
@@ -226,7 +231,7 @@ def get_ai_response(user_message, user_id):
     if any(p in user_message_str for p in CRISIS_KEYWORDS):
         return f"No tienes que pasar por esto solo. Aquí puedes buscar apoyo: {URL_APOYO}"
 
-    # ⚡ cache por usuario (MEJORADO)
+    # ⚡ cache por usuario
     cache_key = f"{user_id}:{user_message_str}"
 
     if cache_key in cache:
@@ -239,7 +244,7 @@ def get_ai_response(user_message, user_id):
     # 🚀 1. GROQ (PRINCIPAL)
     # =========================
     print("🚀 Groq principal")
-    respuesta = responder_con_groq(user_message_str)
+    respuesta = responder_con_groq(user_message_str, user_id)
 
     if respuesta:
         cache[cache_key] = {
@@ -276,3 +281,29 @@ def get_ai_response(user_message, user_id):
     # 🧡 ÚLTIMO RESPALDO
     # =========================
     return "En este momento estoy un poco saturado, pero quiero escucharte. Cuéntame qué está pasando 💬"
+
+
+# =========================
+# 🧠 CONTEXTO (MEMORIA)
+# =========================
+def construir_contexto(usuario):
+    try:
+        from chatbotintegracion.database import obtener_historial
+
+        historial = obtener_historial(usuario, limite=6)
+
+        mensajes = []
+
+        for msg in historial:
+            role = "assistant" if msg.get("tipo") == "bot" else "user"
+
+            mensajes.append({
+                "role": role,
+                "content": msg.get("mensaje", "")
+            })
+
+        return mensajes
+
+    except Exception as e:
+        print("❌ Error construyendo contexto:", e)
+        return []
